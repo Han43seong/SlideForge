@@ -60,7 +60,7 @@ PPTX route for:
 - final `.pptx` delivery
 - recreation of an approved HTML prototype as PPTX
 
-PPTX outputs require a visual render gate before final acceptance.
+PPTX outputs require a visual render gate before final acceptance. SlideForge now writes a dependency-free `pptx-delivery-gate.json` contract for smoke runs or via `slideforge pptx-delivery-gate`; this records the source deck, desired PPTX path, available local validation tools, static/visual checks planned, status (`available`, `unavailable`, or `pending`), and blockers. The gate is strategy evidence only and does not claim PPTX export or visual rendering occurred.
 
 ## Non-production routes
 

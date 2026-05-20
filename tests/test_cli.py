@@ -132,6 +132,34 @@ def test_cli_smoke_html_run_writes_evidence_artifacts(tmp_path):
     assert (runs_dir / "smoke-cli" / "deck.html").exists()
     assert (runs_dir / "smoke-cli" / "manifest.json").exists()
     assert (runs_dir / "smoke-cli" / "browser-regression-plan.json").exists()
+    assert (runs_dir / "smoke-cli" / "pptx-delivery-gate.json").exists()
+
+
+def test_cli_pptx_delivery_gate_writes_strategy_contract(tmp_path):
+    source_path = tmp_path / "deck.html"
+    source_path.write_text("<!doctype html><title>deck</title>", encoding="utf-8")
+    output_dir = tmp_path / "evidence"
+
+    exit_code = main(
+        [
+            "pptx-delivery-gate",
+            "--source",
+            str(source_path),
+            "--desired-pptx",
+            str(tmp_path / "deck.pptx"),
+            "--output-dir",
+            str(output_dir),
+            "--run-id",
+            "gate-cli",
+        ]
+    )
+
+    assert exit_code == 0
+    data = json.loads((output_dir / "pptx-delivery-gate.json").read_text(encoding="utf-8"))
+    assert data["run_id"] == "gate-cli"
+    assert data["report_kind"] == "pptx_delivery_gate"
+    assert data["desired_pptx_path"].endswith("deck.pptx")
+    assert data["validation_claim"] == "strategy_contract_only_no_pptx_export_or_visual_render_performed"
 
 
 def test_cli_score_fidelity_writes_report_json(tmp_path):

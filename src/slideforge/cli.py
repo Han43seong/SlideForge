@@ -19,6 +19,7 @@ from slideforge.guizang_html_composer import (
     VisualChip,
     compose_html_deck,
 )
+from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -103,6 +104,17 @@ def _cmd_smoke_html(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pptx_delivery_gate(args: argparse.Namespace) -> int:
+    write_pptx_delivery_gate(
+        source_path=Path(args.source),
+        desired_pptx_path=Path(args.desired_pptx),
+        output_dir=Path(args.output_dir),
+        run_id=args.run_id or "",
+        report_name=args.report_name,
+    )
+    return 0
+
+
 def _cmd_score_fidelity(args: argparse.Namespace) -> int:
     score = score_fidelity(
         FidelityScoreInput(
@@ -153,6 +165,17 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_html.add_argument("--runs-dir", required=True)
     smoke_html.add_argument("--run-id", required=True)
     smoke_html.set_defaults(func=_cmd_smoke_html)
+
+    pptx_gate = subparsers.add_parser(
+        "pptx-delivery-gate",
+        help="Write a dependency-free PPTX delivery/render strategy contract",
+    )
+    pptx_gate.add_argument("--source", required=True, help="Source HTML/deck path to be exported or recreated as PPTX")
+    pptx_gate.add_argument("--desired-pptx", required=True, help="Desired PPTX output path")
+    pptx_gate.add_argument("--output-dir", required=True, help="Directory for the gate JSON artifact")
+    pptx_gate.add_argument("--run-id", default="")
+    pptx_gate.add_argument("--report-name", default="pptx-delivery-gate.json")
+    pptx_gate.set_defaults(func=_cmd_pptx_delivery_gate)
 
     score = subparsers.add_parser("score-fidelity", help="Write a 100-point fidelity score report")
     score.add_argument("--background", type=int, required=True)
