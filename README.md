@@ -131,6 +131,17 @@ prepare-sections -> prepare-deck -> run-local -> summarize-run
 
 This shortcut does not replace final browser screenshot capture, PPTX export/render evidence, ComfyUI image generation evidence, or fidelity scoring. A smoke-only run is expected to remain `needs_visual_evidence` until those real artifacts are attached.
 
+To share or archive the completed local run directory, package the existing artifacts into a portable evidence pack:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli export-evidence-pack \
+  --run-dir runs/<run-id> \
+  --output runs/<run-id>-evidence-pack.zip \
+  --manifest-output runs/<run-id>-evidence-pack-manifest.json
+```
+
+`export-evidence-pack` is dependency-free and writes a `.zip` with an embedded `evidence-pack-manifest.json` plus optional sidecar manifest. The manifest lists each packaged regular file with `relative_path`, `size_bytes`, and `sha256`, preserves `run-summary.json` status/warnings/blockers/missing external evidence when present, skips symlinks instead of following them, and rejects outputs inside the run directory to avoid recursive packaging. It packages evidence only; it does not generate missing browser, PPTX/render, ComfyUI, or fidelity evidence, so smoke-only packs should honestly preserve `needs_visual_evidence`.
+
 `prepare-sections` turns local plain text/Markdown-like source material into structured section JSON that `prepare-deck` can consume. It is deterministic and extractive: `#`/`##` headings and practical non-empty title lines become section headings, `-`, `*`, and `•` lines become bullets, ids are normalized from headings with duplicate-safe suffixes, and no provider output or unsupported facts are invented. Intent inference uses conservative keyword aliases: timeline/schedule/roadmap/일정/로드맵 -> `timeline`, KPI/metric/table/지표/테이블/표 형식 -> `table`, comparison/compare/vs/비교/대비 -> `comparison`, architecture/system/flow/아키텍처/구조/시스템/흐름 -> `architecture`, visual/image/diagram/비주얼/이미지/다이어그램 -> `visual`; otherwise `--default-intent` is used (`policy` by default).
 
 ```bash

@@ -216,6 +216,35 @@ def test_cli_export_pptx_missing_dependency_writes_report_without_fake_output(tm
     assert data["slide_count_generated"] == 0
     assert not output_path.exists()
 
+
+def test_cli_export_evidence_pack_writes_zip(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "deck.html").write_text("<!doctype html><title>deck</title>", encoding="utf-8")
+    (run_dir / "run-summary.json").write_text(
+        json.dumps({"status": "needs_visual_evidence", "warnings": [], "blockers": [], "missing_external_evidence": ["browser_capture"]}),
+        encoding="utf-8",
+    )
+    output = tmp_path / "pack.zip"
+    sidecar = tmp_path / "pack-manifest.json"
+
+    exit_code = main([
+        "export-evidence-pack",
+        "--run-dir",
+        str(run_dir),
+        "--output",
+        str(output),
+        "--manifest-output",
+        str(sidecar),
+    ])
+
+    assert exit_code == 0
+    assert output.exists()
+    data = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert data["report_kind"] == "evidence_pack_report"
+    assert data["summary_status"] == "needs_visual_evidence"
+    assert data["artifacts"][0]["sha256"]
+
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"
 

@@ -15,6 +15,7 @@ from slideforge.comfyui_handoff import (
 )
 from slideforge.deck_preparer import DEFAULT_ARCHETYPE, load_sections_json, write_prepared_deck
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
+from slideforge.evidence_pack import build_evidence_pack
 from slideforge.evidence_summary import write_evidence_summary
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
@@ -200,6 +201,16 @@ def _cmd_summarize_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export_evidence_pack(args: argparse.Namespace) -> int:
+    result = build_evidence_pack(
+        run_dir=Path(args.run_dir),
+        output=Path(args.output),
+        manifest_output=Path(args.manifest_output) if args.manifest_output else None,
+    )
+    print(json.dumps(result.manifest, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
 def _cmd_run_source_local(args: argparse.Namespace) -> int:
     design_spec = _load_design_spec(Path(args.design_spec)) if args.design_spec else None
     report = run_source_local(
@@ -355,6 +366,15 @@ def build_parser() -> argparse.ArgumentParser:
     pptx_gate.add_argument("--run-id", default="")
     pptx_gate.add_argument("--report-name", default="pptx-delivery-gate.json")
     pptx_gate.set_defaults(func=_cmd_pptx_delivery_gate)
+
+    export_pack = subparsers.add_parser(
+        "export-evidence-pack",
+        help="Package an existing run directory into a dependency-free evidence pack zip with manifest and checksums",
+    )
+    export_pack.add_argument("--run-dir", required=True, help="Existing SlideForge run directory to package")
+    export_pack.add_argument("--output", required=True, help="Output .zip path; must be outside --run-dir")
+    export_pack.add_argument("--manifest-output", help="Optional sidecar manifest JSON path; must be outside --run-dir")
+    export_pack.set_defaults(func=_cmd_export_evidence_pack)
 
     run_source_local_parser = subparsers.add_parser(
         "run-source-local",
