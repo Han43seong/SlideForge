@@ -200,3 +200,68 @@ def test_compose_html_deck_rejects_empty_slides():
         assert "at least one slide" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_compose_html_deck_renders_chart_schema_as_deterministic_svg_bars():
+    from slideforge.guizang_html_composer import ChartDatum
+
+    deck = HtmlDeck(
+        title="chart deck",
+        slides=[
+            HtmlSlide(
+                slide_id="chart-1",
+                title="채널 성과",
+                archetype="bar_chart",
+                chart_data=[
+                    ChartDatum(label="Organic", value=80, note="baseline", color="#35e7ff"),
+                    ChartDatum(label="Paid <unsafe>", value=40, note="needs & review"),
+                ],
+            )
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert 'class="chart-panel"' in html
+    assert '<svg class="bar-chart"' in html
+    assert 'data-chart-kind="bar_chart"' in html
+    assert 'data-chart-value="80"' in html
+    assert 'width="448.0"' in html
+    assert 'viewBox="0 0 560 100"' in html
+    assert 'height="24" rx="8"' in html
+    assert '.chart-panel { margin-top:26px; display:grid; grid-template-columns:1.4fr .9fr; gap:20px; align-items:start; max-width:960px; }' in html
+    assert '.bar-chart { width:100%; min-height:240px; padding:16px;' in html
+    assert '.chart-legend { margin:0; display:grid; gap:8px; }' in html
+    assert '.chart-legend li { max-width:none; padding:11px 13px;' in html
+    assert 'Paid &lt;unsafe&gt;' in html
+    assert 'needs &amp; review' in html
+    assert "<unsafe>" not in html
+
+
+def test_compose_html_deck_renders_comparison_matrix_schema_and_escapes_cells():
+    from slideforge.guizang_html_composer import ComparisonColumn, ComparisonRow
+
+    deck = HtmlDeck(
+        title="matrix deck",
+        slides=[
+            HtmlSlide(
+                slide_id="matrix-1",
+                title="옵션 비교",
+                archetype="comparison_matrix",
+                comparison_columns=[ComparisonColumn(label="A&B", note="fast"), ComparisonColumn(label="B")],
+                comparison_rows=[
+                    ComparisonRow(label="위험", values=["낮음", "<script>x</script>"], note="검토"),
+                    ComparisonRow(label="비용", values=["중", "고"]),
+                ],
+            )
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert 'class="comparison-matrix"' in html
+    assert 'data-column-count="2"' in html
+    assert "A&amp;B" in html
+    assert "&lt;script&gt;x&lt;/script&gt;" in html
+    assert "<script>x</script>" not in html
+    assert "검토" in html

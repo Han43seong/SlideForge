@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from html import escape
+from math import isfinite
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,41 @@ class MetricRow:
 
 
 @dataclass(frozen=True)
+class ChartDatum:
+    label: str
+    value: float
+    note: str = ""
+    color: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("chart datum label is required")
+        if not isinstance(self.value, int | float) or not isfinite(self.value):
+            raise ValueError("chart datum value must be a finite number")
+
+
+@dataclass(frozen=True)
+class ComparisonColumn:
+    label: str
+    note: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("comparison column label is required")
+
+
+@dataclass(frozen=True)
+class ComparisonRow:
+    label: str
+    values: list[str]
+    note: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("comparison row label is required")
+
+
+@dataclass(frozen=True)
 class HtmlSlide:
     slide_id: str
     title: str
@@ -73,6 +109,9 @@ class HtmlSlide:
     asset_placeholders: list[AssetPlaceholder] = field(default_factory=list)
     timeline_steps: list[TimelineStep] = field(default_factory=list)
     metric_rows: list[MetricRow] = field(default_factory=list)
+    chart_data: list[ChartDatum] = field(default_factory=list)
+    comparison_columns: list[ComparisonColumn] = field(default_factory=list)
+    comparison_rows: list[ComparisonRow] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.slide_id.strip():
@@ -204,6 +243,120 @@ def _render_metric_table(slide: HtmlSlide) -> str:
     return "\n      <table class=\"metric-table\">\n" + "\n".join(rows) + "\n      </table>" if rows else ""
 
 
+def _chart_data_from_bullets(bullets: list[str]) -> list[ChartDatum]:
+    data = []
+    for item in bullets:
+        label, sep, value = item.partition("|")
+        if not sep:
+            continue
+        try:
+            numeric_value = float(value.strip())
+        except ValueError:
+            continue
+        data.append(ChartDatum(label=label.strip(), value=numeric_value))
+    return data
+
+
+def _format_chart_value(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
+
+
+def _render_chart(slide: HtmlSlide) -> str:
+    data = slide.chart_data or _chart_data_from_bullets(slide.bullets)
+    if not data:
+        return _render_default_bullets(slide)
+
+    max_value = max((abs(item.value) for item in data), default=0) or 1
+    row_height = 50
+    chart_width = 560
+    chart_height = max(len(data) * row_height, row_height)
+    rows = []
+    legend_items = []
+    for idx, item in enumerate(data):
+        width = round((abs(item.value) / max_value) * (chart_width - 112), 1)
+        y = idx * row_height + 10
+        value_text = _format_chart_value(float(item.value))
+        note = f'<span class="chart-note">{escape(item.note)}</span>' if item.note else ""
+        color_label = f'<span class="chart-color-label">{escape(item.color)}</span>' if item.color else ""
+        rows.append(
+            f'''          <g class="bar-row" data-chart-label="{escape(item.label)}" data-chart-value="{escape(value_text)}" data-chart-color="{escape(item.color)}">
+            <text x="0" y="{y + 20}" class="bar-label">{escape(item.label)}</text>
+            <rect x="112" y="{y}" width="{width}" height="24" rx="8" class="bar-rect bar-rect-{idx % 4}" />
+            <text x="{120 + width}" y="{y + 20}" class="bar-value">{escape(value_text)}</text>
+          </g>'''
+        )
+        legend_items.append(
+            f'''          <li><span class="chart-legend-label">{escape(item.label)}</span><strong>{escape(value_text)}</strong>{note}{color_label}</li>'''
+        )
+    return f'''
+      <div class="chart-panel" data-chart-kind="{escape(slide.archetype)}" data-series-count="{len(data)}">
+        <svg class="bar-chart" viewBox="0 0 {chart_width} {chart_height}" role="img" aria-label="{escape(slide.title)} chart">
+{chr(10).join(rows)}
+        </svg>
+        <ul class="chart-legend">
+{chr(10).join(legend_items)}
+        </ul>
+      </div>'''
+
+
+def _comparison_rows_from_bullets(bullets: list[str]) -> tuple[list[ComparisonColumn], list[ComparisonRow]]:
+    rows = []
+    max_values = 0
+    for item in bullets:
+        parts = [part.strip() for part in item.split("|")]
+        if not parts or not parts[0]:
+            continue
+        values = parts[1:]
+        max_values = max(max_values, len(values))
+        rows.append(ComparisonRow(label=parts[0], values=values))
+    columns = [ComparisonColumn(label=f"Option {idx}") for idx in range(1, max_values + 1)]
+    return columns, rows
+
+
+def _render_comparison_matrix(slide: HtmlSlide) -> str:
+    columns = slide.comparison_columns
+    rows = slide.comparison_rows
+    if not rows:
+        columns, rows = _comparison_rows_from_bullets(slide.bullets)
+    if not rows:
+        return _render_default_bullets(slide)
+    column_count = max(len(columns), max((len(row.values) for row in rows), default=0))
+    if not columns:
+        columns = [ComparisonColumn(label=f"Option {idx}") for idx in range(1, column_count + 1)]
+    elif len(columns) < column_count:
+        columns = columns + [
+            ComparisonColumn(label=f"Option {idx}") for idx in range(len(columns) + 1, column_count + 1)
+        ]
+
+    header = "\n".join(
+        f'''          <th scope="col"><span>{escape(column.label)}</span>{f'<small>{escape(column.note)}</small>' if column.note else ''}</th>'''
+        for column in columns
+    )
+    body_rows = []
+    for row in rows:
+        values = list(row.values) + ["—"] * (len(columns) - len(row.values))
+        cells = "\n".join(f"          <td>{escape(value)}</td>" for value in values[: len(columns)])
+        row_note = f'<small>{escape(row.note)}</small>' if row.note else ""
+        body_rows.append(
+            f'''        <tr>
+          <th scope="row"><span>{escape(row.label)}</span>{row_note}</th>
+{cells}
+        </tr>'''
+        )
+    return f'''
+      <table class="comparison-matrix" data-column-count="{len(columns)}">
+        <thead>
+        <tr>
+          <th scope="col">Criteria</th>
+{header}
+        </tr>
+        </thead>
+        <tbody>
+{chr(10).join(body_rows)}
+        </tbody>
+      </table>'''
+
+
 def _render_archetype_body(slide: HtmlSlide) -> str:
     if slide.archetype in {"visual_band", "architecture_visual", "cover"}:
         return _render_visual_band(slide)
@@ -211,6 +364,10 @@ def _render_archetype_body(slide: HtmlSlide) -> str:
         return _render_timeline(slide)
     if slide.archetype in {"kpi_table", "table"}:
         return _render_metric_table(slide)
+    if slide.archetype in {"chart", "bar_chart"}:
+        return _render_chart(slide)
+    if slide.archetype in {"comparison_matrix", "matrix"}:
+        return _render_comparison_matrix(slide)
     return _render_default_bullets(slide)
 
 
@@ -281,6 +438,22 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .metric-table th, .metric-table td {{ padding:20px 24px; background:rgba(255,255,255,.07); border-top:1px solid rgba(53,231,255,.18); border-bottom:1px solid rgba(53,231,255,.18); font-size:24px; }}
     .metric-table th {{ text-align:left; color:#dff9ff; border-left:1px solid rgba(53,231,255,.18); border-radius:18px 0 0 18px; }}
     .metric-table td {{ text-align:right; color:var(--cyan); font-weight:900; border-right:1px solid rgba(53,231,255,.18); border-radius:0 18px 18px 0; }}
+    .chart-panel {{ margin-top:26px; display:grid; grid-template-columns:1.4fr .9fr; gap:20px; align-items:start; max-width:960px; }}
+    .bar-chart {{ width:100%; min-height:240px; padding:16px; border:1px solid rgba(53,231,255,.2); border-radius:22px; background:rgba(255,255,255,.055); overflow:visible; }}
+    .bar-label {{ fill:#dff9ff; font-size:16px; font-weight:800; }}
+    .bar-value {{ fill:var(--cyan); font-size:16px; font-weight:900; }}
+    .bar-rect {{ fill:var(--cyan); opacity:.82; }}
+    .bar-rect-1 {{ fill:var(--magenta); }}
+    .bar-rect-2 {{ fill:#9df071; }}
+    .bar-rect-3 {{ fill:#ffd166; }}
+    .chart-legend {{ margin:0; display:grid; gap:8px; }}
+    .chart-legend li {{ max-width:none; padding:11px 13px; display:grid; grid-template-columns:1fr auto; gap:4px 10px; font-size:15px; }}
+    .chart-note, .chart-color-label {{ color:var(--muted); font-size:12px; grid-column:1 / -1; }}
+    .comparison-matrix {{ margin-top:38px; border-collapse:separate; border-spacing:0; min-width:780px; max-width:1000px; overflow:hidden; border:1px solid rgba(53,231,255,.2); border-radius:24px; background:rgba(255,255,255,.045); }}
+    .comparison-matrix th, .comparison-matrix td {{ padding:16px 18px; border-right:1px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.1); font-size:18px; vertical-align:top; }}
+    .comparison-matrix th {{ text-align:left; color:#dff9ff; font-weight:900; background:rgba(53,231,255,.08); }}
+    .comparison-matrix td {{ color:#f7fbff; }}
+    .comparison-matrix small {{ display:block; margin-top:5px; color:var(--muted); font-size:13px; font-weight:600; }}
     #counter {{ position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:700; z-index:10; }}
     #progress {{ position:fixed; left:0; bottom:0; height:4px; background:linear-gradient(90deg, var(--cyan), var(--magenta)); width:0; z-index:10; }}
     @media print {{ body {{ overflow:visible; }} .deck {{ width:100vw; height:100vh; }} .slide {{ display:block; position:relative; page-break-after:always; }} #counter, #progress {{ display:none; }} }}

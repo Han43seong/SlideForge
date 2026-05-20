@@ -9,6 +9,9 @@ from slideforge.browser_regression import write_browser_regression_plan
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
 from slideforge.guizang_html_composer import (
     AssetPlaceholder,
+    ChartDatum,
+    ComparisonColumn,
+    ComparisonRow,
     HtmlDeck,
     HtmlSlide,
     MetricRow,
@@ -37,6 +40,9 @@ def _load_smoke_slide(raw: dict[str, Any]) -> HtmlSlide:
     payload["asset_placeholders"] = [AssetPlaceholder(**item) for item in payload.get("asset_placeholders", [])]
     payload["timeline_steps"] = [TimelineStep(**item) for item in payload.get("timeline_steps", [])]
     payload["metric_rows"] = [MetricRow(**item) for item in payload.get("metric_rows", [])]
+    payload["chart_data"] = [ChartDatum(**item) for item in payload.get("chart_data", [])]
+    payload["comparison_columns"] = [ComparisonColumn(**item) for item in payload.get("comparison_columns", [])]
+    payload["comparison_rows"] = [ComparisonRow(**item) for item in payload.get("comparison_rows", [])]
     return HtmlSlide(**payload)
 
 

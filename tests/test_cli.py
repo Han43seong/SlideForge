@@ -225,3 +225,39 @@ def test_cli_score_fidelity_can_write_markdown_report(tmp_path):
     markdown = markdown_path.read_text(encoding="utf-8")
     assert "78 / 100" in markdown
     assert "PASS_WITH_WARNINGS" in markdown
+
+
+def test_cli_compose_html_loads_chart_and_comparison_schema(tmp_path):
+    deck_path = tmp_path / "deck.json"
+    output_path = tmp_path / "deck.html"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "structured visuals",
+                "slides": [
+                    {
+                        "slide_id": "chart-1",
+                        "title": "차트",
+                        "archetype": "chart",
+                        "chart_data": [{"label": "A", "value": 10, "note": "n", "color": "cyan"}],
+                    },
+                    {
+                        "slide_id": "matrix-1",
+                        "title": "비교",
+                        "archetype": "matrix",
+                        "comparison_columns": [{"label": "A"}, {"label": "B", "note": "beta"}],
+                        "comparison_rows": [{"label": "Cost", "values": ["Low", "High"], "note": "range"}],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(["compose-html", "--deck", str(deck_path), "--output", str(output_path)])
+
+    assert exit_code == 0
+    html = output_path.read_text(encoding="utf-8")
+    assert 'class="chart-panel"' in html
+    assert 'class="comparison-matrix"' in html
+    assert "Cost" in html

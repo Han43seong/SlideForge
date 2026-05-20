@@ -79,3 +79,32 @@ def test_write_smoke_run_records_pptx_delivery_gate_without_claiming_export(tmp_
     assert gate["validation_claim"] == "strategy_contract_only_no_pptx_export_or_visual_render_performed"
     assert gate["static_checks_planned"]
     assert gate["visual_checks_planned"]
+
+
+def test_write_smoke_run_loads_chart_and_matrix_schema(tmp_path):
+    run_dir = write_smoke_run(
+        root=tmp_path,
+        run_id="smoke-structured-visuals",
+        deck=SmokeDeckInput(
+            title="Structured",
+            slides=[
+                {
+                    "slide_id": "chart-1",
+                    "title": "Chart",
+                    "archetype": "bar_chart",
+                    "chart_data": [{"label": "A", "value": 5}],
+                },
+                {
+                    "slide_id": "matrix-1",
+                    "title": "Matrix",
+                    "archetype": "comparison_matrix",
+                    "comparison_columns": [{"label": "A"}, {"label": "B"}],
+                    "comparison_rows": [{"label": "Fit", "values": ["Yes", "No"]}],
+                },
+            ],
+        ),
+    )
+
+    html = (run_dir / "deck.html").read_text(encoding="utf-8")
+    assert 'class="chart-panel"' in html
+    assert 'class="comparison-matrix"' in html
