@@ -1,4 +1,4 @@
-"""Oh My Side Design.
+"""SlideForge.
 
 Clean restart of the slide design production pipeline:
 ComfyUI asset forge + guizang HTML composer + PPTX delivery.

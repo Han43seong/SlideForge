@@ -12,7 +12,7 @@ This repository exists to rebuild the slide-generation system around a narrower 
 ## Modules
 
 ```text
-src/oh_my_side_design/
+src/slideforge/
   template_analyzer.py       # extract design grammar from reference inputs
   design_spec.py             # structured color/layout/type/style rules
   archetype_mapper.py        # map source content to template-like slide archetypes

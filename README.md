@@ -1,6 +1,6 @@
-# Oh My Side Design
+# SlideForge
 
-Oh My Side Design is a clean restart of the slide-generation pipeline learned from `hermes-slide-director`.
+SlideForge is a clean restart of the slide-generation pipeline learned from `hermes-slide-director`.
 
 The project focuses on high-fidelity slide production from design references that may be PPTX templates, slide-preview links, screenshots, images, PDFs, or web pages.
 
