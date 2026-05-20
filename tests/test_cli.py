@@ -111,6 +111,28 @@ def test_cli_compose_html_writes_presentation_file(tmp_path):
     assert "폐쇄망 LLM 전략" in html
 
 
+def test_cli_smoke_html_run_writes_evidence_artifacts(tmp_path):
+    deck_path = tmp_path / "deck.json"
+    runs_dir = tmp_path / "runs"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "폐쇄망 LLM 전략",
+                "slides": [
+                    {"slide_id": "s1", "title": "폐쇄망 LLM 전략", "bullets": ["GPU"]}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(["smoke-html", "--deck", str(deck_path), "--runs-dir", str(runs_dir), "--run-id", "smoke-cli"])
+
+    assert exit_code == 0
+    assert (runs_dir / "smoke-cli" / "deck.html").exists()
+    assert (runs_dir / "smoke-cli" / "manifest.json").exists()
+
+
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"
 

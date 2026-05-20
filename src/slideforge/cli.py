@@ -10,6 +10,7 @@ from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
 from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
+from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
 
@@ -74,6 +75,16 @@ def _cmd_compose_html(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_smoke_html(args: argparse.Namespace) -> int:
+    raw = json.loads(Path(args.deck).read_text(encoding="utf-8"))
+    write_smoke_run(
+        root=Path(args.runs_dir),
+        run_id=args.run_id,
+        deck=SmokeDeckInput(title=raw["title"], slides=raw.get("slides", [])),
+    )
+    return 0
+
+
 def _cmd_score_fidelity(args: argparse.Namespace) -> int:
     score = score_fidelity(
         FidelityScoreInput(
@@ -114,6 +125,12 @@ def build_parser() -> argparse.ArgumentParser:
     compose_html.add_argument("--deck", required=True)
     compose_html.add_argument("--output", required=True)
     compose_html.set_defaults(func=_cmd_compose_html)
+
+    smoke_html = subparsers.add_parser("smoke-html", help="Write a compose-html smoke run with manifest/evidence artifacts")
+    smoke_html.add_argument("--deck", required=True)
+    smoke_html.add_argument("--runs-dir", required=True)
+    smoke_html.add_argument("--run-id", required=True)
+    smoke_html.set_defaults(func=_cmd_smoke_html)
 
     score = subparsers.add_parser("score-fidelity", help="Write a 100-point fidelity score report")
     score.add_argument("--background", type=int, required=True)
