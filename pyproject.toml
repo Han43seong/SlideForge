@@ -1,5 +1,5 @@
 [project]
-name = "hermes-slide-forge"
+name = "oh-my-side-design"
 version = "0.1.0"
 description = "High-fidelity slide generation pipeline with ComfyUI assets, guizang HTML composition, and PPTX delivery."
 requires-python = ">=3.11"

@@ -1,6 +1,6 @@
-"""Hermes Slide Forge.
+"""Oh My Side Design.
 
-Clean restart of the slide production pipeline:
+Clean restart of the slide design production pipeline:
 ComfyUI asset forge + guizang HTML composer + PPTX delivery.
 """
 

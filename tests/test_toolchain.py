@@ -1,4 +1,4 @@
-from hermes_slide_forge.toolchain import default_toolchain
+from oh_my_side_design.toolchain import default_toolchain
 
 
 def test_default_toolchain_is_fixed_to_two_production_routes():
