@@ -32,10 +32,63 @@ class HtmlDeck:
             raise ValueError("HTML deck requires at least one slide")
 
 
+def _render_default_bullets(slide: HtmlSlide) -> str:
+    bullets = "\n".join(f"        <li>{escape(item)}</li>" for item in slide.bullets)
+    return f"\n      <ul>\n{bullets}\n      </ul>" if slide.bullets else ""
+
+
+def _render_visual_band(slide: HtmlSlide) -> str:
+    chips = "\n".join(f'          <span class="visual-chip">{escape(item)}</span>' for item in slide.bullets)
+    return f'''\n      <div class="visual-band" aria-label="visual motifs">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-magenta"></div>
+        <div class="light-ribbon"></div>
+        <div class="visual-chips">
+{chips}
+        </div>
+      </div>'''
+
+
+def _render_timeline(slide: HtmlSlide) -> str:
+    steps = []
+    total = max(len(slide.bullets), 1)
+    for idx, item in enumerate(slide.bullets, start=1):
+        steps.append(
+            f'''        <div class="timeline-step" style="--step:{idx}; --total:{total}">
+          <span class="timeline-dot">{idx:02d}</span>
+          <span class="timeline-label">{escape(item)}</span>
+        </div>'''
+        )
+    return "\n      <div class=\"timeline-track\">\n" + "\n".join(steps) + "\n      </div>" if steps else ""
+
+
+def _render_metric_table(slide: HtmlSlide) -> str:
+    rows = []
+    for item in slide.bullets:
+        label, sep, value = item.partition("|")
+        value = value if sep else ""
+        rows.append(
+            f'''        <tr>
+          <th>{escape(label.strip())}</th>
+          <td>{escape(value.strip())}</td>
+        </tr>'''
+        )
+    return "\n      <table class=\"metric-table\">\n" + "\n".join(rows) + "\n      </table>" if rows else ""
+
+
+def _render_archetype_body(slide: HtmlSlide) -> str:
+    if slide.archetype in {"visual_band", "architecture_visual", "cover"}:
+        return _render_visual_band(slide)
+    if slide.archetype == "timeline":
+        return _render_timeline(slide)
+    if slide.archetype in {"kpi_table", "table"}:
+        return _render_metric_table(slide)
+    return _render_default_bullets(slide)
+
+
 def _render_slide(slide: HtmlSlide, index: int, total: int) -> str:
     subtitle = f'<p class="subtitle">{escape(slide.subtitle)}</p>' if slide.subtitle else ""
-    bullets = "\n".join(f"        <li>{escape(item)}</li>" for item in slide.bullets)
-    bullet_block = f"\n      <ul>\n{bullets}\n      </ul>" if slide.bullets else ""
+    body = _render_archetype_body(slide)
     asset_style = ""
     if slide.asset_path:
         asset_style = f'<div class="asset" style="background-image:url(\'{escape(slide.asset_path)}\')"></div>'
@@ -44,7 +97,7 @@ def _render_slide(slide: HtmlSlide, index: int, total: int) -> str:
       <div class="slide-content">
         <div class="eyebrow">{index:02d} / {total:02d}</div>
         <h1>{escape(slide.title)}</h1>
-        {subtitle}{bullet_block}
+        {subtitle}{body}
       </div>
     </section>'''
 
@@ -73,6 +126,22 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .subtitle {{ color:var(--muted); font-size:28px; margin:22px 0 0; }}
     ul {{ margin:40px 0 0; padding:0; list-style:none; display:grid; gap:16px; }}
     li {{ max-width:760px; padding:18px 22px; border:1px solid rgba(53,231,255,.28); border-radius:18px; background:rgba(255,255,255,.055); font-size:24px; }}
+    .visual-band {{ position:absolute; right:72px; bottom:88px; width:46%; height:42%; border:1px solid rgba(53,231,255,.24); border-radius:32px; background:linear-gradient(135deg, rgba(53,231,255,.12), rgba(255,79,216,.11)); overflow:hidden; box-shadow:0 24px 90px rgba(0,0,0,.35); }}
+    .orb {{ position:absolute; width:180px; height:180px; border-radius:999px; filter:blur(6px); opacity:.78; }}
+    .orb-cyan {{ right:18%; top:8%; background:radial-gradient(circle, rgba(53,231,255,.95), rgba(53,231,255,.08) 64%, transparent 70%); }}
+    .orb-magenta {{ left:10%; bottom:2%; background:radial-gradient(circle, rgba(255,79,216,.82), rgba(255,79,216,.08) 64%, transparent 70%); }}
+    .light-ribbon {{ position:absolute; inset:38% -12%; height:24px; background:linear-gradient(90deg, transparent, rgba(53,231,255,.82), rgba(255,79,216,.78), transparent); filter:blur(4px); transform:rotate(-14deg); }}
+    .visual-chips {{ position:absolute; left:24px; right:24px; bottom:24px; display:flex; flex-wrap:wrap; gap:10px; }}
+    .visual-chip {{ padding:9px 13px; border-radius:999px; background:rgba(2,3,10,.62); border:1px solid rgba(255,255,255,.18); color:#e6fbff; font-size:14px; font-weight:700; }}
+    .timeline-track {{ margin-top:58px; position:relative; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:22px; max-width:960px; }}
+    .timeline-track::before {{ content:""; position:absolute; left:0; right:0; top:31px; height:2px; background:linear-gradient(90deg, var(--cyan), var(--magenta)); opacity:.62; }}
+    .timeline-step {{ position:relative; padding-top:76px; }}
+    .timeline-dot {{ position:absolute; top:0; left:0; width:62px; height:62px; border-radius:18px; display:grid; place-items:center; background:linear-gradient(135deg, var(--cyan), var(--magenta)); color:#02030a; font-weight:900; box-shadow:0 14px 42px rgba(53,231,255,.22); }}
+    .timeline-label {{ display:block; padding:18px; min-height:88px; border-radius:18px; background:rgba(255,255,255,.065); border:1px solid rgba(255,255,255,.12); font-size:22px; }}
+    .metric-table {{ margin-top:42px; border-collapse:separate; border-spacing:0 12px; min-width:720px; max-width:940px; }}
+    .metric-table th, .metric-table td {{ padding:20px 24px; background:rgba(255,255,255,.07); border-top:1px solid rgba(53,231,255,.18); border-bottom:1px solid rgba(53,231,255,.18); font-size:24px; }}
+    .metric-table th {{ text-align:left; color:#dff9ff; border-left:1px solid rgba(53,231,255,.18); border-radius:18px 0 0 18px; }}
+    .metric-table td {{ text-align:right; color:var(--cyan); font-weight:900; border-right:1px solid rgba(53,231,255,.18); border-radius:0 18px 18px 0; }}
     #counter {{ position:fixed; right:28px; bottom:24px; color:var(--muted); font-weight:700; z-index:10; }}
     #progress {{ position:fixed; left:0; bottom:0; height:4px; background:linear-gradient(90deg, var(--cyan), var(--magenta)); width:0; z-index:10; }}
     @media print {{ body {{ overflow:visible; }} .deck {{ width:100vw; height:100vh; }} .slide {{ display:block; position:relative; page-break-after:always; }} #counter, #progress {{ display:none; }} }}

@@ -34,6 +34,26 @@ def test_compose_html_deck_outputs_presentation_shell():
     assert "GPU 추론 계층" in html
 
 
+def test_compose_html_deck_renders_archetype_specific_sections():
+    deck = HtmlDeck(
+        title="archetype deck",
+        slides=[
+            HtmlSlide(slide_id="visual", title="비주얼 밴드", bullets=["Aurora", "3D chip"], archetype="visual_band"),
+            HtmlSlide(slide_id="timeline", title="일정", bullets=["PoC", "Pilot", "Scale"], archetype="timeline"),
+            HtmlSlide(slide_id="table", title="KPI", bullets=["정확도 | 85%", "응답시간 | 2초"], archetype="kpi_table"),
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert 'class="visual-band"' in html
+    assert 'class="timeline-track"' in html
+    assert 'class="timeline-step"' in html
+    assert 'class="metric-table"' in html
+    assert "정확도" in html
+    assert "85%" in html
+
+
 def test_compose_html_deck_escapes_user_content():
     deck = HtmlDeck(
         title="<script>alert(1)</script>",
