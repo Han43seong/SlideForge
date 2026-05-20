@@ -14,6 +14,7 @@ from slideforge.comfyui_handoff import (
     write_comfyui_handoff_report,
 )
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
+from slideforge.evidence_summary import write_evidence_summary
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
 from slideforge.guizang_html_composer import compose_html_deck
@@ -164,6 +165,15 @@ def _cmd_pptx_delivery_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_summarize_run(args: argparse.Namespace) -> int:
+    write_evidence_summary(
+        run_dir=Path(args.run_dir),
+        output=Path(args.output) if args.output else None,
+        markdown_output=Path(args.markdown_output) if args.markdown_output else None,
+    )
+    return 0
+
+
 def _cmd_score_fidelity(args: argparse.Namespace) -> int:
     score = score_fidelity(
         FidelityScoreInput(
@@ -264,6 +274,12 @@ def build_parser() -> argparse.ArgumentParser:
     pptx_gate.add_argument("--run-id", default="")
     pptx_gate.add_argument("--report-name", default="pptx-delivery-gate.json")
     pptx_gate.set_defaults(func=_cmd_pptx_delivery_gate)
+
+    summarize = subparsers.add_parser("summarize-run", help="Aggregate run artifacts into an operator evidence summary")
+    summarize.add_argument("--run-dir", required=True, help="Directory containing SlideForge run artifacts")
+    summarize.add_argument("--output", help="JSON output path; defaults to <run-dir>/run-summary.json")
+    summarize.add_argument("--markdown-output", help="Optional Markdown output path")
+    summarize.set_defaults(func=_cmd_summarize_run)
 
     score = subparsers.add_parser("score-fidelity", help="Write a 100-point fidelity score report")
     score.add_argument("--background", type=int, required=True)

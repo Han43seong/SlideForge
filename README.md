@@ -111,6 +111,19 @@ PYTHONPATH=src python -m slideforge.cli capture-screenshots \
 
 The runner writes `browser-regression-report.json` plus `slide-XX.png` files. The report records `capture_mode: real_playwright_chromium`, detected slide count, viewport, browser name, console errors, capture status, and per-slide ids/archetypes when the HTML exposes `data-slide-id` and `data-archetype`.
 
+## Run evidence summary
+
+`summarize-run` aggregates existing run artifacts into one operator-readable JSON report and, when requested, a plain Markdown report. It is dependency-free and evidence-first: missing optional artifacts become warnings or pending next actions, and reports never claim browser, PPTX, or ComfyUI evidence unless the corresponding artifact records it.
+
+```bash
+PYTHONPATH=src python -m slideforge.cli summarize-run \
+  --run-dir runs/<run-id> \
+  --output runs/<run-id>/run-summary.json \
+  --markdown-output runs/<run-id>/run-summary.md
+```
+
+The summary inspects `manifest.json`, `evidence-index.md`, `deck.json`, `deck.html`, browser plans/capture reports, PPTX gate/export reports, ComfyUI handoff reports, and naturally named fidelity score/report files. Top-level statuses include `ready`, `ready_with_warnings`, `needs_visual_evidence`, and `blocked`.
+
 ## Non-production routes
 
 - `codex-reveal-playwright`: fallback/export experiment only.
