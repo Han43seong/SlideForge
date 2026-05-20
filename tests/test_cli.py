@@ -162,3 +162,37 @@ def test_cli_score_fidelity_writes_report_json(tmp_path):
     data = json.loads(output_path.read_text(encoding="utf-8"))
     assert data["total"] == 86
     assert data["rating"] == "high-fidelity candidate"
+
+
+def test_cli_score_fidelity_can_write_markdown_report(tmp_path):
+    json_path = tmp_path / "score.json"
+    markdown_path = tmp_path / "score.md"
+
+    exit_code = main(
+        [
+            "score-fidelity",
+            "--background",
+            "16",
+            "--generated-assets",
+            "14",
+            "--layout-archetype",
+            "15",
+            "--typography",
+            "8",
+            "--data-visuals",
+            "8",
+            "--korean-readability",
+            "8",
+            "--technical-validity",
+            "9",
+            "--output",
+            str(json_path),
+            "--markdown-output",
+            str(markdown_path),
+        ]
+    )
+
+    assert exit_code == 0
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "78 / 100" in markdown
+    assert "PASS_WITH_WARNINGS" in markdown

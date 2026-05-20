@@ -8,6 +8,7 @@ from typing import Any
 from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
+from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
 from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
@@ -98,6 +99,10 @@ def _cmd_score_fidelity(args: argparse.Namespace) -> int:
         )
     )
     _write_json(Path(args.output), score.to_dict())
+    if args.markdown_output:
+        markdown_output = Path(args.markdown_output)
+        markdown_output.parent.mkdir(parents=True, exist_ok=True)
+        markdown_output.write_text(render_fidelity_report(score), encoding="utf-8")
     return 0
 
 
@@ -141,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     score.add_argument("--korean-readability", type=int, required=True)
     score.add_argument("--technical-validity", type=int, required=True)
     score.add_argument("--output", required=True)
+    score.add_argument("--markdown-output")
     score.set_defaults(func=_cmd_score_fidelity)
     return parser
 
