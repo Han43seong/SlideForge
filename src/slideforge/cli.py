@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from slideforge.archetype_mapper import ArchetypeMapping
+from slideforge.asset_brief_generator import generate_asset_briefs
+from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -21,10 +24,38 @@ def _load_observations(path: Path) -> list[TemplateObservation]:
     return [TemplateObservation(**item) for item in raw]
 
 
+def _load_design_spec(path: Path) -> DesignSpec:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return DesignSpec(
+        name=raw["name"],
+        source_refs=raw.get("source_refs", []),
+        colors=[ColorToken(**item) for item in raw.get("colors", [])],
+        typography=[TypographyToken(**item) for item in raw.get("typography", [])],
+        slide_archetypes=[SlideArchetype(**item) for item in raw.get("slide_archetypes", [])],
+        background_layers=raw.get("background_layers", []),
+        graphic_motifs=raw.get("graphic_motifs", []),
+    )
+
+
+def _load_mappings(path: Path) -> list[ArchetypeMapping]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError("mappings JSON must be a list")
+    return [ArchetypeMapping(**item) for item in raw]
+
+
 def _cmd_build_spec(args: argparse.Namespace) -> int:
     observations = _load_observations(Path(args.observations))
     spec = build_design_spec_from_observations(args.name, observations)
     _write_json(Path(args.output), spec.to_dict())
+    return 0
+
+
+def _cmd_generate_asset_briefs(args: argparse.Namespace) -> int:
+    spec = _load_design_spec(Path(args.design_spec))
+    mappings = _load_mappings(Path(args.mappings))
+    brief_set = generate_asset_briefs(spec, mappings)
+    _write_json(Path(args.output), brief_set.to_comfyui_queue_payload(seed=args.seed))
     return 0
 
 
@@ -53,6 +84,16 @@ def build_parser() -> argparse.ArgumentParser:
     build_spec.add_argument("--observations", required=True)
     build_spec.add_argument("--output", required=True)
     build_spec.set_defaults(func=_cmd_build_spec)
+
+    asset_briefs = subparsers.add_parser(
+        "generate-asset-briefs",
+        help="Generate text-free ComfyUI asset briefs from a design spec and archetype mappings",
+    )
+    asset_briefs.add_argument("--design-spec", required=True)
+    asset_briefs.add_argument("--mappings", required=True)
+    asset_briefs.add_argument("--output", required=True)
+    asset_briefs.add_argument("--seed", type=int)
+    asset_briefs.set_defaults(func=_cmd_generate_asset_briefs)
 
     score = subparsers.add_parser("score-fidelity", help="Write a 100-point fidelity score report")
     score.add_argument("--background", type=int, required=True)

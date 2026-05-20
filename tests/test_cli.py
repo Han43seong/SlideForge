@@ -32,6 +32,55 @@ def test_cli_build_spec_writes_design_spec_json(tmp_path):
     assert data["slide_archetypes"][0]["name"] == "cover"
 
 
+def test_cli_generate_asset_briefs_writes_comfyui_payload(tmp_path):
+    design_spec_path = tmp_path / "design-spec.json"
+    mappings_path = tmp_path / "mappings.json"
+    output_path = tmp_path / "asset-briefs.json"
+    design_spec_path.write_text(
+        json.dumps(
+            {
+                "name": "Blockchain visual",
+                "source_refs": [],
+                "colors": [],
+                "typography": [],
+                "slide_archetypes": [],
+                "background_layers": ["aurora ribbon"],
+                "graphic_motifs": ["3D glass chip"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    mappings_path.write_text(
+        json.dumps(
+            [
+                {"section_id": "s1", "archetype_name": "cover", "content_summary": "전략"},
+                {"section_id": "s2", "archetype_name": "kpi_table", "content_summary": "KPI"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "generate-asset-briefs",
+            "--design-spec",
+            str(design_spec_path),
+            "--mappings",
+            str(mappings_path),
+            "--output",
+            str(output_path),
+            "--seed",
+            "42",
+        ]
+    )
+
+    assert exit_code == 0
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert data["seed"] == 42
+    assert data["briefs"][0]["asset_type"] == "cover_background"
+    assert data["briefs"][1]["text_policy"] == "text-free"
+
+
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"
 
