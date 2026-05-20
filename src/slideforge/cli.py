@@ -7,6 +7,7 @@ from typing import Any
 
 from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
+from slideforge.browser_capture import capture_html_deck_screenshots
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
@@ -110,6 +111,18 @@ def _cmd_smoke_html(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_capture_screenshots(args: argparse.Namespace) -> int:
+    viewport = {"width": args.viewport_width, "height": args.viewport_height}
+    capture_html_deck_screenshots(
+        deck_html=Path(args.deck_html),
+        output_dir=Path(args.output_dir),
+        expected_slide_count=args.expected_slide_count,
+        viewport=viewport,
+        report_name=args.report_name,
+    )
+    return 0
+
+
 def _cmd_pptx_delivery_gate(args: argparse.Namespace) -> int:
     write_pptx_delivery_gate(
         source_path=Path(args.source),
@@ -171,6 +184,18 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_html.add_argument("--runs-dir", required=True)
     smoke_html.add_argument("--run-id", required=True)
     smoke_html.set_defaults(func=_cmd_smoke_html)
+
+    capture = subparsers.add_parser(
+        "capture-screenshots",
+        help="Capture per-slide screenshots from a local HTML deck with Playwright Chromium",
+    )
+    capture.add_argument("--deck-html", required=True, help="Path to the local HTML deck to open in Chromium")
+    capture.add_argument("--output-dir", required=True, help="Directory for PNG screenshots and browser-regression-report.json")
+    capture.add_argument("--expected-slide-count", type=int, help="Fail if the detected .slide count differs")
+    capture.add_argument("--viewport-width", type=int, default=1280)
+    capture.add_argument("--viewport-height", type=int, default=720)
+    capture.add_argument("--report-name", default="browser-regression-report.json")
+    capture.set_defaults(func=_cmd_capture_screenshots)
 
     pptx_gate = subparsers.add_parser(
         "pptx-delivery-gate",

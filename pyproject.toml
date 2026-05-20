@@ -10,6 +10,7 @@ slideforge = "slideforge.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+browser = ["playwright>=1.45"]
 
 [build-system]
 requires = ["hatchling"]
@@ -18,3 +19,4 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["browser: tests that launch a real Playwright browser when available"]

@@ -62,6 +62,22 @@ PPTX route for:
 
 PPTX outputs require a visual render gate before final acceptance. SlideForge now writes a dependency-free `pptx-delivery-gate.json` contract for smoke runs or via `slideforge pptx-delivery-gate`; this records the source deck, desired PPTX path, available local validation tools, static/visual checks planned, status (`available`, `unavailable`, or `pending`), and blockers. The gate is strategy evidence only and does not claim PPTX export or visual rendering occurred.
 
+
+## Real browser screenshot capture
+
+`smoke-html` still writes the dependency-free `browser-regression-plan.json`. For real PNG evidence, install the optional browser extra and Chromium, then run the Playwright Chromium capture command against a generated HTML deck:
+
+```bash
+python -m pip install -e '.[browser]'
+python -m playwright install chromium
+PYTHONPATH=src python -m slideforge.cli capture-screenshots \
+  --deck-html runs/<run-id>/deck.html \
+  --output-dir runs/<run-id>/browser-capture \
+  --expected-slide-count 5
+```
+
+The runner writes `browser-regression-report.json` plus `slide-XX.png` files. The report records `capture_mode: real_playwright_chromium`, detected slide count, viewport, browser name, console errors, capture status, and per-slide ids/archetypes when the HTML exposes `data-slide-id` and `data-archetype`.
+
 ## Non-production routes
 
 - `codex-reveal-playwright`: fallback/export experiment only.
