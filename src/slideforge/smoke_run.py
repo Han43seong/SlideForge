@@ -7,7 +7,8 @@ from typing import Any
 
 from slideforge.browser_regression import write_browser_regression_plan
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
-from slideforge.guizang_html_composer import (
+from slideforge.guizang_html_composer import compose_html_deck
+from slideforge.schemas import (
     AssetPlaceholder,
     ChartDatum,
     ComparisonColumn,
@@ -17,7 +18,6 @@ from slideforge.guizang_html_composer import (
     MetricRow,
     TimelineStep,
     VisualChip,
-    compose_html_deck,
 )
 from slideforge.run_manifest import EvidenceArtifact, RunManifest, RunManifestWriter
 

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide
+from slideforge.schemas import HtmlDeck, HtmlSlide
 from slideforge.pptx_delivery_gate import ToolAvailability
 
 

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from slideforge.guizang_html_composer import HtmlDeck
+from slideforge.schemas import HtmlDeck
 
 
 @dataclass(frozen=True)

@@ -16,7 +16,8 @@ from slideforge.comfyui_handoff import (
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
-from slideforge.guizang_html_composer import (
+from slideforge.guizang_html_composer import compose_html_deck
+from slideforge.schemas import (
     AssetPlaceholder,
     ChartDatum,
     ComparisonColumn,
@@ -26,7 +27,6 @@ from slideforge.guizang_html_composer import (
     MetricRow,
     TimelineStep,
     VisualChip,
-    compose_html_deck,
 )
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
 from slideforge.pptx_export import export_pptx_report
