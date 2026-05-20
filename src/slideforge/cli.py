@@ -15,6 +15,7 @@ from slideforge.comfyui_handoff import (
 )
 from slideforge.deck_preparer import DEFAULT_ARCHETYPE, load_sections_json, write_prepared_deck
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
+from slideforge.design_source_pipeline import run_design_source_local
 from slideforge.evidence_pack import build_evidence_pack
 from slideforge.evidence_summary import write_evidence_summary
 from slideforge.fidelity_report import render_fidelity_report
@@ -211,6 +212,22 @@ def _cmd_export_evidence_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_run_design_source_local(args: argparse.Namespace) -> int:
+    report = run_design_source_local(
+        source=Path(args.source),
+        observations=Path(args.observations),
+        design_name=args.design_name,
+        title=args.title,
+        runs_dir=Path(args.runs_dir),
+        run_id=args.run_id,
+        default_intent=args.default_intent,
+        default_archetype=args.default_archetype,
+        input_output_dir=Path(args.input_output_dir) if args.input_output_dir else None,
+    )
+    print(json.dumps(report.to_dict(), ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
 def _cmd_run_source_local(args: argparse.Namespace) -> int:
     design_spec = _load_design_spec(Path(args.design_spec)) if args.design_spec else None
     report = run_source_local(
@@ -400,6 +417,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional deterministic handoff directory for sections.json and deck.json; defaults to <runs-dir>/<run-id>-input",
     )
     run_source_local_parser.set_defaults(func=_cmd_run_source_local)
+
+    run_design_source_local_parser = subparsers.add_parser(
+        "run-design-source-local",
+        help="Build a design spec from local observations, then run source material through the local smoke pipeline",
+    )
+    run_design_source_local_parser.add_argument("--source", required=True, help="Local plain text/Markdown-like source path")
+    run_design_source_local_parser.add_argument("--observations", required=True, help="Local template observations JSON path")
+    run_design_source_local_parser.add_argument("--design-name", required=True, help="DesignSpec name to write")
+    run_design_source_local_parser.add_argument("--title", required=True, help="Deck title")
+    run_design_source_local_parser.add_argument("--runs-dir", required=True, help="Runs root directory")
+    run_design_source_local_parser.add_argument("--run-id", required=True, help="Deterministic run identifier")
+    run_design_source_local_parser.add_argument(
+        "--default-intent",
+        default="policy",
+        help="Fallback intent when no deterministic keyword alias matches; defaults to policy",
+    )
+    run_design_source_local_parser.add_argument(
+        "--default-archetype",
+        default=DEFAULT_ARCHETYPE,
+        help=f"Fallback archetype when no design spec match applies; defaults to {DEFAULT_ARCHETYPE}",
+    )
+    run_design_source_local_parser.add_argument(
+        "--input-output-dir",
+        help="Optional deterministic handoff directory for design-spec.json, sections.json, and deck.json; defaults to <runs-dir>/<run-id>-input",
+    )
+    run_design_source_local_parser.set_defaults(func=_cmd_run_design_source_local)
 
     run_local_parser = subparsers.add_parser(
         "run-local",

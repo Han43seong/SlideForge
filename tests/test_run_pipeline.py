@@ -219,3 +219,186 @@ def test_run_source_local_default_intent_reaches_sections_and_deck(tmp_path):
     assert sections[0]["intent"] == "explainer"
     assert deck["slides"][0]["subtitle"] == "Intent: explainer"
     assert deck["slides"][0]["archetype"] == "text_explainer"
+
+
+def _write_observations(path: Path, *, slide_role: str = "policy_card") -> None:
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "source_ref": "preview-01.png",
+                    "slide_role": slide_role,
+                    "colors": {"deep_navy": "#02030A"},
+                    "typography": {"title": {"font_family": "Inter", "size_px": 64, "weight": 800}},
+                    "background_layers": ["dark gradient"],
+                    "graphic_motifs": ["glass card"],
+                    "layout_notes": ["large title with card body"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_run_design_source_local_api_writes_design_spec_sections_deck_run_and_uses_archetype(tmp_path):
+    from slideforge.design_source_pipeline import run_design_source_local
+
+    source_path = tmp_path / "source.md"
+    observations_path = tmp_path / "observations.json"
+    runs_dir = tmp_path / "runs"
+    source_path.write_text("# Governance update\n- Keep review cadence weekly\n", encoding="utf-8")
+    _write_observations(observations_path, slide_role="policy_card")
+
+    report = run_design_source_local(
+        source=source_path,
+        observations=observations_path,
+        design_name="Design Source API",
+        title="Design Source API",
+        runs_dir=runs_dir,
+        run_id="design-source-api",
+    )
+
+    assert report.run_dir == runs_dir / "design-source-api"
+    assert report.design_spec_path == runs_dir / "design-source-api-input" / "design-spec.json"
+    assert report.sections_path == runs_dir / "design-source-api-input" / "sections.json"
+    assert report.deck_input_path == runs_dir / "design-source-api-input" / "deck.json"
+    assert report.design_spec_path.exists()
+    assert report.sections_path.exists()
+    assert report.deck_input_path.exists()
+    assert (report.run_dir / "deck.html").exists()
+    assert (report.run_dir / "run-summary.json").exists()
+    spec = json.loads(report.design_spec_path.read_text(encoding="utf-8"))
+    deck = json.loads(report.deck_input_path.read_text(encoding="utf-8"))
+    assert spec["name"] == "Design Source API"
+    assert deck["slides"][0]["archetype"] == "policy_card"
+    assert report.summary_status == "needs_visual_evidence"
+    assert report.blockers == []
+    assert "real_browser_screenshot_capture" in report.missing_external_evidence
+    assert any("browser_capture_not_captured" in warning for warning in report.warnings)
+
+
+def test_cli_run_design_source_local_prints_compact_report_and_honest_smoke_status(tmp_path, capsys):
+    source_path = tmp_path / "source.md"
+    observations_path = tmp_path / "observations.json"
+    runs_dir = tmp_path / "runs"
+    handoff_dir = tmp_path / "handoff"
+    _write_source(source_path)
+    _write_observations(observations_path, slide_role="timeline")
+
+    exit_code = main([
+        "run-design-source-local",
+        "--source",
+        str(source_path),
+        "--observations",
+        str(observations_path),
+        "--design-name",
+        "Design Source CLI",
+        "--title",
+        "Design Source CLI",
+        "--runs-dir",
+        str(runs_dir),
+        "--run-id",
+        "design-source-cli",
+        "--input-output-dir",
+        str(handoff_dir),
+    ])
+
+    assert exit_code == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["report_kind"] == "design_source_local_run_report"
+    assert report["summary_status"] == "needs_visual_evidence"
+    assert report["blockers"] == []
+    assert report["design_spec_path"] == (handoff_dir / "design-spec.json").as_posix()
+    assert report["sections_path"] == (handoff_dir / "sections.json").as_posix()
+    assert report["deck_input_path"] == (handoff_dir / "deck.json").as_posix()
+    assert any(path.endswith("run-summary.json") for path in report["generated_artifacts"])
+    summary = json.loads((runs_dir / "design-source-cli" / "run-summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "needs_visual_evidence"
+    assert any("pptx_gate_pending" in warning for warning in summary["warnings"])
+    assert any("fidelity_pending" in warning for warning in summary["warnings"])
+
+
+def test_run_design_source_local_missing_observations_fails_before_creating_artifacts(tmp_path):
+    from slideforge.design_source_pipeline import run_design_source_local
+
+    source_path = tmp_path / "source.md"
+    runs_dir = tmp_path / "runs"
+    _write_source(source_path)
+
+    with pytest.raises(FileNotFoundError):
+        run_design_source_local(
+            source=source_path,
+            observations=tmp_path / "missing.json",
+            design_name="Missing",
+            title="Missing",
+            runs_dir=runs_dir,
+            run_id="missing-observations",
+        )
+
+    assert not runs_dir.exists()
+
+
+def test_run_design_source_local_invalid_observations_fails_before_creating_artifacts(tmp_path):
+    from slideforge.design_source_pipeline import run_design_source_local
+
+    source_path = tmp_path / "source.md"
+    observations_path = tmp_path / "observations.json"
+    runs_dir = tmp_path / "runs"
+    _write_source(source_path)
+    observations_path.write_text(json.dumps({"not": "a-list"}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="observations JSON"):
+        run_design_source_local(
+            source=source_path,
+            observations=observations_path,
+            design_name="Invalid",
+            title="Invalid",
+            runs_dir=runs_dir,
+            run_id="invalid-observations",
+        )
+
+    assert not runs_dir.exists()
+
+
+def test_run_design_source_local_malformed_observation_object_fails_before_creating_artifacts(tmp_path):
+    from slideforge.design_source_pipeline import run_design_source_local
+
+    source_path = tmp_path / "source.md"
+    observations_path = tmp_path / "observations.json"
+    runs_dir = tmp_path / "runs"
+    _write_source(source_path)
+    observations_path.write_text(json.dumps([{"source_ref": "missing-required-fields"}]), encoding="utf-8")
+
+    with pytest.raises(TypeError):
+        run_design_source_local(
+            source=source_path,
+            observations=observations_path,
+            design_name="Malformed",
+            title="Malformed",
+            runs_dir=runs_dir,
+            run_id="malformed-observations",
+        )
+
+    assert not runs_dir.exists()
+
+
+def test_run_design_source_local_rejects_path_like_run_id_before_creating_artifacts(tmp_path):
+    from slideforge.design_source_pipeline import run_design_source_local
+
+    source_path = tmp_path / "source.md"
+    observations_path = tmp_path / "observations.json"
+    runs_dir = tmp_path / "runs"
+    _write_source(source_path)
+    _write_observations(observations_path)
+
+    with pytest.raises(ValueError, match="run_id"):
+        run_design_source_local(
+            source=source_path,
+            observations=observations_path,
+            design_name="Bad",
+            title="Bad",
+            runs_dir=runs_dir,
+            run_id="../escape",
+        )
+
+    assert not runs_dir.exists()

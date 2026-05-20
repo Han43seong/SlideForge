@@ -129,7 +129,21 @@ PYTHONPATH=src python -m slideforge.cli run-source-local \
 prepare-sections -> prepare-deck -> run-local -> summarize-run
 ```
 
-This shortcut does not replace final browser screenshot capture, PPTX export/render evidence, ComfyUI image generation evidence, or fidelity scoring. A smoke-only run is expected to remain `needs_visual_evidence` until those real artifacts are attached.
+When the operator also has local design-reference observations JSON, use the all-in-one design-source path:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli run-design-source-local \
+  --source source.md \
+  --observations observations.json \
+  --design-name "Reference design" \
+  --title "폐쇄망 AI 운영 전략" \
+  --runs-dir runs \
+  --run-id <run-id>
+```
+
+`run-design-source-local` first builds `runs/<run-id>-input/design-spec.json` from the local observations, then uses that design spec while writing `sections.json`, `deck.json`, and the smoke run under `runs/<run-id>/`. Its compact JSON stdout includes `run_dir`, `design_spec_path`, `sections_path`, `deck_input_path`, generated artifacts, summary status, blockers, warnings, and missing external evidence. Use `--input-output-dir` only as an explicit handoff-directory override if the operator wants `design-spec.json`, `sections.json`, and `deck.json` outside the default `runs/<run-id>-input` location. This is deterministic design-spec preparation and local source handoff only; it is not provider inference, visual-reference understanding, browser evidence, PPTX evidence, or ComfyUI generation evidence.
+
+These shortcuts do not replace final browser screenshot capture, PPTX export/render evidence, ComfyUI image generation evidence, or fidelity scoring. A smoke-only run is expected to remain `needs_visual_evidence` until those real artifacts are attached.
 
 To share or archive the completed local run directory, package the existing artifacts into a portable evidence pack:
 
