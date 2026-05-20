@@ -54,7 +54,7 @@ def run_local(
     or ComfyUI generation; missing external evidence remains warnings/next actions in the
     summary.
     """
-    _validate_run_id(run_id)
+    validate_run_id(run_id)
 
     deck_payload = _load_deck_payload(Path(deck))
     run_dir = write_smoke_run(
@@ -91,7 +91,7 @@ def run_local(
     )
 
 
-def _validate_run_id(run_id: str) -> None:
+def validate_run_id(run_id: str) -> None:
     if not run_id.strip():
         raise ValueError("run_id is required")
     if not _RUN_ID_PATTERN.fullmatch(run_id):

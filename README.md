@@ -113,11 +113,23 @@ The runner writes `browser-regression-report.json` plus `slide-XX.png` files. Th
 
 ## Local deterministic handoff runner
 
-The full dependency-free operator path is:
+The full dependency-free operator path is now available as one source-material command:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli run-source-local \
+  --source source.md \
+  --title "폐쇄망 AI 운영 전략" \
+  --runs-dir runs \
+  --run-id <run-id>
+```
+
+`run-source-local` writes deterministic handoff inputs to `runs/<run-id>-input/sections.json` and `runs/<run-id>-input/deck.json`, then writes smoke run artifacts and summaries under `runs/<run-id>/`. Its JSON stdout reports `run_dir`, `sections_path`, `deck_input_path`, generated artifacts, status, blockers, warnings, and missing external evidence. Use `--input-output-dir` only when an operator explicitly wants the handoff files outside the default `runs/<run-id>-input` location. It composes the same primitives operators can still run manually:
 
 ```text
 prepare-sections -> prepare-deck -> run-local -> summarize-run
 ```
+
+This shortcut does not replace final browser screenshot capture, PPTX export/render evidence, ComfyUI image generation evidence, or fidelity scoring. A smoke-only run is expected to remain `needs_visual_evidence` until those real artifacts are attached.
 
 `prepare-sections` turns local plain text/Markdown-like source material into structured section JSON that `prepare-deck` can consume. It is deterministic and extractive: `#`/`##` headings and practical non-empty title lines become section headings, `-`, `*`, and `•` lines become bullets, ids are normalized from headings with duplicate-safe suffixes, and no provider output or unsupported facts are invented. Intent inference uses conservative keyword aliases: timeline/schedule/roadmap/일정/로드맵 -> `timeline`, KPI/metric/table/지표/테이블/표 형식 -> `table`, comparison/compare/vs/비교/대비 -> `comparison`, architecture/system/flow/아키텍처/구조/시스템/흐름 -> `architecture`, visual/image/diagram/비주얼/이미지/다이어그램 -> `visual`; otherwise `--default-intent` is used (`policy` by default).
 

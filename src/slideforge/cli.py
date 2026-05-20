@@ -35,6 +35,7 @@ from slideforge.pptx_export import export_pptx_report
 from slideforge.run_pipeline import run_local
 from slideforge.section_preparer import write_prepared_sections
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
+from slideforge.source_pipeline import run_source_local
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
 
@@ -199,6 +200,21 @@ def _cmd_summarize_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_run_source_local(args: argparse.Namespace) -> int:
+    design_spec = _load_design_spec(Path(args.design_spec)) if args.design_spec else None
+    report = run_source_local(
+        source=Path(args.source),
+        title=args.title,
+        runs_dir=Path(args.runs_dir),
+        run_id=args.run_id,
+        default_intent=args.default_intent,
+        default_archetype=args.default_archetype,
+        design_spec=design_spec,
+        input_output_dir=Path(args.input_output_dir) if args.input_output_dir else None,
+    )
+    print(json.dumps(report.to_dict(), ensure_ascii=False, separators=(",", ":")))
+    return 0
+
 def _cmd_run_local(args: argparse.Namespace) -> int:
     report = run_local(
         deck=Path(args.deck),
@@ -339,6 +355,31 @@ def build_parser() -> argparse.ArgumentParser:
     pptx_gate.add_argument("--run-id", default="")
     pptx_gate.add_argument("--report-name", default="pptx-delivery-gate.json")
     pptx_gate.set_defaults(func=_cmd_pptx_delivery_gate)
+
+    run_source_local_parser = subparsers.add_parser(
+        "run-source-local",
+        help="Run source material through prepare-sections, prepare-deck, and run-local in one dependency-free command",
+    )
+    run_source_local_parser.add_argument("--source", required=True, help="Local plain text/Markdown-like source path")
+    run_source_local_parser.add_argument("--title", required=True, help="Deck title")
+    run_source_local_parser.add_argument("--runs-dir", required=True, help="Runs root directory")
+    run_source_local_parser.add_argument("--run-id", required=True, help="Deterministic run identifier")
+    run_source_local_parser.add_argument(
+        "--default-intent",
+        default="policy",
+        help="Fallback intent when no deterministic keyword alias matches; defaults to policy",
+    )
+    run_source_local_parser.add_argument(
+        "--default-archetype",
+        default=DEFAULT_ARCHETYPE,
+        help=f"Fallback archetype when no design spec or intent alias applies; defaults to {DEFAULT_ARCHETYPE}",
+    )
+    run_source_local_parser.add_argument("--design-spec", help="Optional DesignSpec JSON with available slide archetypes")
+    run_source_local_parser.add_argument(
+        "--input-output-dir",
+        help="Optional deterministic handoff directory for sections.json and deck.json; defaults to <runs-dir>/<run-id>-input",
+    )
+    run_source_local_parser.set_defaults(func=_cmd_run_source_local)
 
     run_local_parser = subparsers.add_parser(
         "run-local",
