@@ -13,6 +13,7 @@ from slideforge.comfyui_handoff import (
     DEFAULT_REPORT_NAME,
     write_comfyui_handoff_report,
 )
+from slideforge.deck_preparer import DEFAULT_ARCHETYPE, load_sections_json, write_prepared_deck
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.evidence_summary import write_evidence_summary
 from slideforge.fidelity_report import render_fidelity_report
@@ -84,6 +85,19 @@ def _load_html_slide(raw: dict[str, Any]) -> HtmlSlide:
     payload["comparison_columns"] = [ComparisonColumn(**item) for item in payload.get("comparison_columns", [])]
     payload["comparison_rows"] = [ComparisonRow(**item) for item in payload.get("comparison_rows", [])]
     return HtmlSlide(**payload)
+
+
+def _cmd_prepare_deck(args: argparse.Namespace) -> int:
+    design_spec = _load_design_spec(Path(args.design_spec)) if args.design_spec else None
+    sections = load_sections_json(Path(args.sections))
+    write_prepared_deck(
+        title=args.title,
+        sections=sections,
+        output=Path(args.output),
+        design_spec=design_spec,
+        default_archetype=args.default_archetype,
+    )
+    return 0
 
 
 def _cmd_build_spec(args: argparse.Namespace) -> int:
@@ -210,6 +224,22 @@ def _cmd_score_fidelity(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="slideforge")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+
+    prepare_deck = subparsers.add_parser(
+        "prepare-deck",
+        help="Prepare an HtmlDeck-compatible deck JSON from structured content sections",
+    )
+    prepare_deck.add_argument("--title", required=True, help="Deck title")
+    prepare_deck.add_argument("--sections", required=True, help="JSON list of ContentSection-compatible objects")
+    prepare_deck.add_argument("--output", required=True, help="Prepared HtmlDeck-compatible JSON output path")
+    prepare_deck.add_argument("--design-spec", help="Optional DesignSpec JSON with available slide archetypes")
+    prepare_deck.add_argument(
+        "--default-archetype",
+        default=DEFAULT_ARCHETYPE,
+        help=f"Fallback archetype when no design spec or intent alias applies; defaults to {DEFAULT_ARCHETYPE}",
+    )
+    prepare_deck.set_defaults(func=_cmd_prepare_deck)
 
     build_spec = subparsers.add_parser("build-spec", help="Build a design-spec JSON from template observations")
     build_spec.add_argument("--name", required=True)

@@ -113,11 +113,20 @@ The runner writes `browser-regression-report.json` plus `slide-XX.png` files. Th
 
 ## Local deterministic handoff runner
 
+`prepare-deck` turns real-user structured sections into an HtmlDeck-compatible JSON without calling providers or inventing unsupported claims. Sections are a JSON list with `id`, `heading`, `intent`, and optional list-of-string `bullets`; `--design-spec` may provide available archetypes, otherwise conservative intent aliases and `text_explainer` fallback are used.
+
+```bash
+PYTHONPATH=src python -m slideforge.cli prepare-deck \
+  --title "폐쇄망 AI 운영 전략" \
+  --sections sections.json \
+  --output runs/<run-id>-input/deck.json
+```
+
 `run-local` is the one-command local operator handoff path for an existing HtmlDeck-compatible JSON deck. It is dependency-free: it writes the smoke HTML run, manifest/evidence index, browser regression plan, PPTX delivery gate, and default `run-summary.json` plus `run-summary.md` in the run directory. It does not perform final visual, PPTX render, or ComfyUI acceptance; those remain warnings/next actions until real evidence artifacts are attached.
 
 ```bash
 PYTHONPATH=src python -m slideforge.cli run-local \
-  --deck deck.json \
+  --deck runs/<run-id>-input/deck.json \
   --runs-dir runs \
   --run-id <run-id>
 ```
