@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from slideforge.browser_regression import write_browser_regression_plan
 from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
 from slideforge.run_manifest import EvidenceArtifact, RunManifest, RunManifestWriter
 
@@ -36,14 +37,17 @@ def write_smoke_run(root: str | Path, run_id: str, deck: SmokeDeckInput) -> Path
 
     deck_json = run_dir / "deck.json"
     deck_html = run_dir / "deck.html"
-    html = compose_html_deck(deck.to_html_deck())
+    html_deck = deck.to_html_deck()
+    html = compose_html_deck(html_deck)
     deck_json.write_text(json.dumps(deck.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     deck_html.write_text(html, encoding="utf-8")
+    browser_plan = write_browser_regression_plan(deck=html_deck, deck_path=deck_html, output_dir=run_dir)
 
     checks = {
         "html_contains_presentation_shell": "pass" if "function showSlide" in html else "fail",
         "html_contains_counter": "pass" if "#counter" in html else "fail",
         "html_slide_count": str(html.count('class="slide"')),
+        "browser_regression_plan_written": "pass" if browser_plan.exists() else "fail",
     }
 
     manifest = RunManifest(
@@ -54,6 +58,12 @@ def write_smoke_run(root: str | Path, run_id: str, deck: SmokeDeckInput) -> Path
         artifacts=[
             EvidenceArtifact(name="source_deck", path="deck.json", kind="json"),
             EvidenceArtifact(name="html_deck", path="deck.html", kind="html"),
+            EvidenceArtifact(
+                name="browser_regression_plan",
+                path="browser-regression-plan.json",
+                kind="json",
+                description="Dependency-free browser/screenshot regression checklist; no screenshots captured.",
+            ),
         ],
         checks=checks,
     )

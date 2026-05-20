@@ -131,6 +131,7 @@ def test_cli_smoke_html_run_writes_evidence_artifacts(tmp_path):
     assert exit_code == 0
     assert (runs_dir / "smoke-cli" / "deck.html").exists()
     assert (runs_dir / "smoke-cli" / "manifest.json").exists()
+    assert (runs_dir / "smoke-cli" / "browser-regression-plan.json").exists()
 
 
 def test_cli_score_fidelity_writes_report_json(tmp_path):
