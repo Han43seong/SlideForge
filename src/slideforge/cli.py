@@ -29,6 +29,7 @@ from slideforge.guizang_html_composer import (
     compose_html_deck,
 )
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
+from slideforge.pptx_export import export_pptx_report
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -141,6 +142,17 @@ def _cmd_capture_screenshots(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export_pptx(args: argparse.Namespace) -> int:
+    deck = _load_html_deck(Path(args.deck))
+    export_pptx_report(
+        deck=deck,
+        output_path=Path(args.output),
+        report_output=Path(args.report_output),
+        run_id=args.run_id or "",
+    )
+    return 0
+
+
 def _cmd_pptx_delivery_gate(args: argparse.Namespace) -> int:
     write_pptx_delivery_gate(
         source_path=Path(args.source),
@@ -231,6 +243,16 @@ def build_parser() -> argparse.ArgumentParser:
     capture.add_argument("--viewport-height", type=int, default=720)
     capture.add_argument("--report-name", default="browser-regression-report.json")
     capture.set_defaults(func=_cmd_capture_screenshots)
+
+    export_pptx = subparsers.add_parser(
+        "export-pptx",
+        help="Export a deck JSON to PPTX when optional python-pptx is installed; otherwise write an honest unavailable report",
+    )
+    export_pptx.add_argument("--deck", required=True, help="HtmlDeck-compatible deck JSON")
+    export_pptx.add_argument("--output", required=True, help="PPTX output path to create only when python-pptx is available")
+    export_pptx.add_argument("--report-output", required=True, help="JSON report path for generation/static evidence")
+    export_pptx.add_argument("--run-id", default="")
+    export_pptx.set_defaults(func=_cmd_export_pptx)
 
     pptx_gate = subparsers.add_parser(
         "pptx-delivery-gate",

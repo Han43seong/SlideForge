@@ -81,7 +81,8 @@ class PptxDeliveryGate:
             status = "unavailable"
             selected = "manual_or_external_pptx_renderer"
             blockers = [
-                "No local PPTX export/render validation tool is available: " + ", ".join(missing_tools) + "."
+                "No local PPTX export/render validation tool is available: " + ", ".join(missing_tools) + ".",
+                "Renderer evidence requires approved pptx-glimpse installation; no install was performed.",
             ]
         else:
             status = "pending"

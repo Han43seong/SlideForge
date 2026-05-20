@@ -33,7 +33,8 @@ def test_pptx_delivery_gate_records_unavailable_strategy_honestly(tmp_path):
     assert payload["static_checks_planned"]
     assert payload["visual_checks_planned"]
     assert payload["blockers"] == [
-        "No local PPTX export/render validation tool is available: libreoffice, pptx_glimpse."
+        "No local PPTX export/render validation tool is available: libreoffice, pptx_glimpse.",
+        "Renderer evidence requires approved pptx-glimpse installation; no install was performed.",
     ]
     assert payload["validation_claim"] == "strategy_contract_only_no_pptx_export_or_visual_render_performed"
 

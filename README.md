@@ -62,7 +62,21 @@ PPTX route for:
 
 PPTX outputs require a visual render gate before final acceptance. SlideForge now writes a dependency-free `pptx-delivery-gate.json` contract for smoke runs or via `slideforge pptx-delivery-gate`; this records the source deck, desired PPTX path, available local validation tools, static/visual checks planned, status (`available`, `unavailable`, or `pending`), and blockers. The gate is strategy evidence only and does not claim PPTX export or visual rendering occurred.
 
+SlideForge also exposes a real PPTX generation seam through `export-pptx`. Actual `.pptx` output requires the optional `pptx` extra (`python-pptx`) to be installed by an approved operator; the command never installs dependencies automatically and never creates a fake PPTX when the dependency is missing. It always writes a JSON report with dependency status, output path, file existence/size, expected/generated slide counts, and blockers. Renderer evidence is only attached as an availability path when `pptx-glimpse` is already on `PATH`; otherwise the report says that approved `pptx-glimpse` installation is required for visual evidence.
 
+```bash
+# Approved install step, if desired outside no-install tasks:
+uv pip install -e '.[pptx]'
+# If using a Python environment with pip available, `python -m pip install -e '.[pptx]'` is also fine.
+
+PYTHONPATH=src python -m slideforge.cli export-pptx \
+  --deck runs/<run-id>/deck.json \
+  --output runs/<run-id>/deck.pptx \
+  --report-output runs/<run-id>/pptx-export-report.json \
+  --run-id <run-id>
+```
+
+The first-pass native PPTX seam maps deck title, subtitle, bullets, metrics, timeline, chart, comparison, and visual-chip content into deterministic PowerPoint shapes/text with Korean-capable font metadata where possible. It is not a visual parity claim; use renderer evidence or manual QA before final delivery.
 
 ## ComfyUI handoff report
 

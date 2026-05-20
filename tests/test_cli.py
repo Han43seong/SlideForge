@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from slideforge.cli import main
+from slideforge.pptx_export import PptxRendererEvidence
 
 
 def test_cli_build_spec_writes_design_spec_json(tmp_path):
@@ -161,6 +162,59 @@ def test_cli_pptx_delivery_gate_writes_strategy_contract(tmp_path):
     assert data["desired_pptx_path"].endswith("deck.pptx")
     assert data["validation_claim"] == "strategy_contract_only_no_pptx_export_or_visual_render_performed"
 
+
+def test_cli_export_pptx_missing_dependency_writes_report_without_fake_output(tmp_path, monkeypatch):
+    monkeypatch.setattr("slideforge.pptx_export.python_pptx_available", lambda: False)
+    monkeypatch.setattr(
+        "slideforge.pptx_export.PptxRendererEvidence.detect",
+        lambda: PptxRendererEvidence(
+            strategy="pptx_glimpse_required_for_renderer_evidence",
+            status="unavailable",
+            tool={"name": "pptx_glimpse", "executable": "pptx-glimpse", "available": False, "path": ""},
+            blockers=["Renderer evidence requires approved pptx-glimpse installation; no install was performed."],
+        ),
+    )
+    deck_path = tmp_path / "deck.json"
+    output_path = tmp_path / "deck.pptx"
+    report_path = tmp_path / "pptx-export-report.json"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "폐쇄망 LLM 전략",
+                "slides": [
+                    {
+                        "slide_id": "s1",
+                        "title": "폐쇄망 LLM 전략",
+                        "subtitle": "의사결정용",
+                        "bullets": ["GPU", "RAG"],
+                        "archetype": "cover",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main([
+        "export-pptx",
+        "--deck",
+        str(deck_path),
+        "--output",
+        str(output_path),
+        "--report-output",
+        str(report_path),
+        "--run-id",
+        "cli-missing",
+    ])
+
+    assert exit_code == 0
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    assert data["report_kind"] == "pptx_export"
+    assert data["status"] == "unavailable"
+    assert data["generation_claim"] == "no_pptx_output_created_python_pptx_missing"
+    assert data["slide_count_expected"] == 1
+    assert data["slide_count_generated"] == 0
+    assert not output_path.exists()
 
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"

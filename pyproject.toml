@@ -11,6 +11,7 @@ slideforge = "slideforge.cli:main"
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 browser = ["playwright>=1.45"]
+pptx = ["python-pptx>=1.0.2"]
 
 [build-system]
 requires = ["hatchling"]
