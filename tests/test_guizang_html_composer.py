@@ -1,4 +1,12 @@
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
+from slideforge.guizang_html_composer import (
+    AssetPlaceholder,
+    HtmlDeck,
+    HtmlSlide,
+    MetricRow,
+    TimelineStep,
+    VisualChip,
+    compose_html_deck,
+)
 
 
 def test_compose_html_deck_outputs_presentation_shell():
@@ -88,6 +96,88 @@ def test_compose_html_deck_supports_structured_archetype_content():
     assert "85%" in html
     assert "정확도 | 85%" not in html
 
+
+
+def test_compose_html_deck_renders_comfyui_asset_placeholders_for_visual_archetypes():
+    deck = HtmlDeck(
+        title="asset placeholders",
+        slides=[
+            HtmlSlide(
+                slide_id="cover-1",
+                title="전략 표지",
+                archetype="cover",
+                asset_placeholders=[
+                    AssetPlaceholder(
+                        slot_id="hero-bg",
+                        asset_type="cover_background",
+                        prompt="text-free dark aurora background",
+                        output_hint="generated-assets/cover-1-cover_background.png",
+                    )
+                ],
+            ),
+            HtmlSlide(
+                slide_id="arch-1",
+                title="아키텍처",
+                archetype="architecture_visual",
+                visual_chips=[VisualChip(label="RAG"), VisualChip(label="GPU")],
+            ),
+            HtmlSlide(slide_id="text-1", title="본문", archetype="text_explainer", bullets=["no placeholder"]),
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert 'class="visual-band-layout"' in html
+    assert 'class="visual-chip-rail"' in html
+    assert 'grid-template-rows:minmax(0, 1fr) auto' in html
+    assert 'gap:18px' in html
+    assert 'border-top:1px solid rgba(255,255,255,.14)' in html
+    assert 'class="asset-placeholder-card"' in html
+    assert 'data-asset-provider="comfyui"' in html
+    assert 'data-asset-status="placeholder-only"' in html
+    assert 'data-asset-slot="hero-bg"' in html
+    assert 'data-asset-type="cover_background"' in html
+    assert 'data-output-hint="generated-assets/cover-1-cover_background.png"' in html
+    assert "ComfyUI asset placeholder" in html
+    assert "text-free dark aurora background" in html
+    assert 'data-asset-slot="arch-1-visual-band"' in html
+    assert 'data-prompt="visual band placeholder for 아키텍처: RAG, GPU"' in html
+    assert 'data-asset-slot="text-1' not in html
+
+
+def test_asset_placeholder_rejects_real_integration_paths_and_escapes_metadata():
+    try:
+        AssetPlaceholder(slot_id="bad", asset_type="cover_background", prompt="ok", generated_path="generated.png")
+    except ValueError as exc:
+        assert "placeholder-only" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+    html = compose_html_deck(
+        HtmlDeck(
+            title="escape",
+            slides=[
+                HtmlSlide(
+                    slide_id="s1",
+                    title="safe",
+                    archetype="cover",
+                    asset_placeholders=[
+                        AssetPlaceholder(
+                            slot_id="slot-<x>",
+                            asset_type="cover_background",
+                            prompt="<script>alert(1)</script>",
+                            output_hint="assets/a&b.png",
+                        )
+                    ],
+                )
+            ],
+        )
+    )
+
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert 'data-asset-slot="slot-&lt;x&gt;"' in html
+    assert 'data-output-hint="assets/a&amp;b.png"' in html
 
 def test_compose_html_deck_escapes_user_content():
     deck = HtmlDeck(

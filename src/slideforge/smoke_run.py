@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from slideforge.browser_regression import write_browser_regression_plan
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
+from slideforge.guizang_html_composer import (
+    AssetPlaceholder,
+    HtmlDeck,
+    HtmlSlide,
+    MetricRow,
+    TimelineStep,
+    VisualChip,
+    compose_html_deck,
+)
 from slideforge.run_manifest import EvidenceArtifact, RunManifest, RunManifestWriter
 
 
@@ -25,6 +33,7 @@ class SmokeDeckInput:
 def _load_smoke_slide(raw: dict[str, Any]) -> HtmlSlide:
     payload = dict(raw)
     payload["visual_chips"] = [VisualChip(**item) for item in payload.get("visual_chips", [])]
+    payload["asset_placeholders"] = [AssetPlaceholder(**item) for item in payload.get("asset_placeholders", [])]
     payload["timeline_steps"] = [TimelineStep(**item) for item in payload.get("timeline_steps", [])]
     payload["metric_rows"] = [MetricRow(**item) for item in payload.get("metric_rows", [])]
     return HtmlSlide(**payload)

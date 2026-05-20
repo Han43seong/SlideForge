@@ -15,6 +15,31 @@ class VisualChip:
 
 
 @dataclass(frozen=True)
+class AssetPlaceholder:
+    slot_id: str
+    asset_type: str
+    prompt: str
+    provider: str = "comfyui"
+    status: str = "placeholder-only"
+    output_hint: str | None = None
+    generated_path: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.slot_id.strip():
+            raise ValueError("asset placeholder slot_id is required")
+        if not self.asset_type.strip():
+            raise ValueError("asset placeholder asset_type is required")
+        if not self.prompt.strip():
+            raise ValueError("asset placeholder prompt is required")
+        if self.provider != "comfyui":
+            raise ValueError("asset placeholders currently support only comfyui provider")
+        if self.status != "placeholder-only":
+            raise ValueError("asset placeholders must remain placeholder-only")
+        if self.generated_path:
+            raise ValueError("asset placeholders are placeholder-only; use output_hint, not generated_path")
+
+
+@dataclass(frozen=True)
 class TimelineStep:
     label: str
     detail: str = ""
@@ -45,6 +70,7 @@ class HtmlSlide:
     archetype: str = "text_explainer"
     asset_path: str | None = None
     visual_chips: list[VisualChip] = field(default_factory=list)
+    asset_placeholders: list[AssetPlaceholder] = field(default_factory=list)
     timeline_steps: list[TimelineStep] = field(default_factory=list)
     metric_rows: list[MetricRow] = field(default_factory=list)
 
@@ -72,18 +98,73 @@ def _render_default_bullets(slide: HtmlSlide) -> str:
     return f"\n      <ul>\n{bullets}\n      </ul>" if slide.bullets else ""
 
 
+def _is_asset_placeholder_archetype(archetype: str) -> bool:
+    return archetype in {"visual_band", "architecture_visual", "cover"}
+
+
+def _asset_type_for_visual_archetype(archetype: str) -> str:
+    if archetype == "cover":
+        return "cover_background"
+    return "visual_band"
+
+
+def _default_asset_placeholder(slide: HtmlSlide, chip_items: list[VisualChip]) -> AssetPlaceholder:
+    context = ", ".join(chip.label for chip in chip_items[:4]) or slide.subtitle or "text-free generated visual"
+    slot_kind = "cover-background" if slide.archetype == "cover" else "visual-band"
+    asset_type = _asset_type_for_visual_archetype(slide.archetype)
+    return AssetPlaceholder(
+        slot_id=f"{slide.slide_id}-{slot_kind}",
+        asset_type=asset_type,
+        prompt=f"{slot_kind.replace('-', ' ')} placeholder for {slide.title}: {context}",
+        output_hint=f"generated-assets/{slide.slide_id}-{asset_type}.png",
+    )
+
+
+def _render_asset_placeholder(placeholder: AssetPlaceholder) -> str:
+    output_hint = escape(placeholder.output_hint or "")
+    return f'''
+        <aside class="asset-placeholder-card"
+          data-asset-provider="{escape(placeholder.provider)}"
+          data-asset-status="{escape(placeholder.status)}"
+          data-asset-slot="{escape(placeholder.slot_id)}"
+          data-asset-type="{escape(placeholder.asset_type)}"
+          data-output-hint="{output_hint}"
+          data-prompt="{escape(placeholder.prompt)}">
+          <span class="asset-placeholder-kicker">ComfyUI asset placeholder</span>
+          <strong>{escape(placeholder.asset_type)}</strong>
+          <span class="asset-placeholder-slot">slot: {escape(placeholder.slot_id)}</span>
+          <span class="asset-placeholder-hint">output: {output_hint or "pending"}</span>
+          <span class="asset-placeholder-prompt">{escape(placeholder.prompt)}</span>
+        </aside>'''
+
+
+def _render_asset_placeholders(slide: HtmlSlide, chip_items: list[VisualChip]) -> str:
+    if not _is_asset_placeholder_archetype(slide.archetype):
+        return ""
+    placeholders = slide.asset_placeholders or [_default_asset_placeholder(slide, chip_items)]
+    cards = "".join(_render_asset_placeholder(placeholder) for placeholder in placeholders)
+    return f'''
+        <div class="asset-placeholder-stack" aria-label="ComfyUI asset placeholder slots">{cards}
+        </div>'''
+
+
 def _render_visual_band(slide: HtmlSlide) -> str:
     chip_items = slide.visual_chips or [VisualChip(label=item) for item in slide.bullets]
     chips = "\n".join(
         f'          <span class="visual-chip" data-emphasis="{escape(chip.emphasis)}">{escape(chip.label)}</span>'
         for chip in chip_items
     )
+    placeholders = _render_asset_placeholders(slide, chip_items)
     return f'''\n      <div class="visual-band" aria-label="visual motifs">
         <div class="orb orb-cyan"></div>
         <div class="orb orb-magenta"></div>
         <div class="light-ribbon"></div>
-        <div class="visual-chips">
+        <div class="visual-band-layout">{placeholders}
+          <div class="visual-chip-rail" aria-label="visual chip labels">
+            <div class="visual-chips">
 {chips}
+            </div>
+          </div>
         </div>
       </div>'''
 
@@ -176,13 +257,20 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .subtitle {{ color:var(--muted); font-size:28px; margin:22px 0 0; }}
     ul {{ margin:40px 0 0; padding:0; list-style:none; display:grid; gap:16px; }}
     li {{ max-width:760px; padding:18px 22px; border:1px solid rgba(53,231,255,.28); border-radius:18px; background:rgba(255,255,255,.055); font-size:24px; }}
-    .visual-band {{ position:absolute; right:72px; bottom:92px; width:38%; height:24%; border:1px solid rgba(53,231,255,.24); border-radius:32px; background:linear-gradient(135deg, rgba(53,231,255,.12), rgba(255,79,216,.11)); overflow:hidden; box-shadow:0 24px 90px rgba(0,0,0,.35); }}
+    .visual-band {{ position:absolute; right:72px; bottom:76px; width:40%; height:32%; border:1px solid rgba(53,231,255,.24); border-radius:32px; background:linear-gradient(135deg, rgba(53,231,255,.12), rgba(255,79,216,.11)); overflow:hidden; box-shadow:0 24px 90px rgba(0,0,0,.35); }}
     .orb {{ position:absolute; width:180px; height:180px; border-radius:999px; filter:blur(6px); opacity:.78; }}
     .orb-cyan {{ right:18%; top:8%; background:radial-gradient(circle, rgba(53,231,255,.95), rgba(53,231,255,.08) 64%, transparent 70%); }}
     .orb-magenta {{ left:10%; bottom:2%; background:radial-gradient(circle, rgba(255,79,216,.82), rgba(255,79,216,.08) 64%, transparent 70%); }}
     .light-ribbon {{ position:absolute; inset:38% -12%; height:24px; background:linear-gradient(90deg, transparent, rgba(53,231,255,.82), rgba(255,79,216,.78), transparent); filter:blur(4px); transform:rotate(-14deg); }}
-    .visual-chips {{ position:absolute; left:24px; right:24px; bottom:24px; display:flex; flex-wrap:wrap; gap:10px; }}
+    .visual-band-layout {{ position:absolute; inset:24px; z-index:2; display:grid; grid-template-rows:minmax(0, 1fr) auto; gap:18px; align-content:space-between; }}
+    .visual-chip-rail {{ padding-top:14px; border-top:1px solid rgba(255,255,255,.14); }}
+    .visual-chips {{ display:flex; flex-wrap:wrap; gap:10px; }}
     .visual-chip {{ padding:9px 13px; border-radius:999px; background:rgba(2,3,10,.62); border:1px solid rgba(255,255,255,.18); color:#e6fbff; font-size:14px; font-weight:700; }}
+    .asset-placeholder-stack {{ display:grid; gap:10px; min-width:0; }}
+    .asset-placeholder-card {{ display:grid; gap:4px; padding:12px 14px; border:1px dashed rgba(53,231,255,.5); border-radius:16px; background:rgba(2,3,10,.7); color:#dff9ff; font-size:12px; box-shadow:0 12px 34px rgba(0,0,0,.24); }}
+    .asset-placeholder-kicker {{ color:var(--cyan); font-size:11px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }}
+    .asset-placeholder-card strong {{ font-size:15px; }}
+    .asset-placeholder-slot, .asset-placeholder-hint, .asset-placeholder-prompt {{ color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
     .timeline-track {{ margin-top:58px; position:relative; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:22px; max-width:960px; }}
     .timeline-track::before {{ content:""; position:absolute; left:0; right:0; top:31px; height:2px; background:linear-gradient(90deg, var(--cyan), var(--magenta)); opacity:.62; }}
     .timeline-step {{ position:relative; padding-top:76px; }}

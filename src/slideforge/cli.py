@@ -10,7 +10,15 @@ from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
+from slideforge.guizang_html_composer import (
+    AssetPlaceholder,
+    HtmlDeck,
+    HtmlSlide,
+    MetricRow,
+    TimelineStep,
+    VisualChip,
+    compose_html_deck,
+)
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -56,6 +64,7 @@ def _load_html_deck(path: Path) -> HtmlDeck:
 def _load_html_slide(raw: dict[str, Any]) -> HtmlSlide:
     payload = dict(raw)
     payload["visual_chips"] = [VisualChip(**item) for item in payload.get("visual_chips", [])]
+    payload["asset_placeholders"] = [AssetPlaceholder(**item) for item in payload.get("asset_placeholders", [])]
     payload["timeline_steps"] = [TimelineStep(**item) for item in payload.get("timeline_steps", [])]
     payload["metric_rows"] = [MetricRow(**item) for item in payload.get("metric_rows", [])]
     return HtmlSlide(**payload)
