@@ -113,12 +113,27 @@ The runner writes `browser-regression-report.json` plus `slide-XX.png` files. Th
 
 ## Local deterministic handoff runner
 
-`prepare-deck` turns real-user structured sections into an HtmlDeck-compatible JSON without calling providers or inventing unsupported claims. Sections are a JSON list with `id`, `heading`, `intent`, and optional list-of-string `bullets`; `--design-spec` may provide available archetypes, otherwise conservative intent aliases and `text_explainer` fallback are used.
+The full dependency-free operator path is:
+
+```text
+prepare-sections -> prepare-deck -> run-local -> summarize-run
+```
+
+`prepare-sections` turns local plain text/Markdown-like source material into structured section JSON that `prepare-deck` can consume. It is deterministic and extractive: `#`/`##` headings and practical non-empty title lines become section headings, `-`, `*`, and `•` lines become bullets, ids are normalized from headings with duplicate-safe suffixes, and no provider output or unsupported facts are invented. Intent inference uses conservative keyword aliases: timeline/schedule/roadmap/일정/로드맵 -> `timeline`, KPI/metric/table/지표/테이블/표 형식 -> `table`, comparison/compare/vs/비교/대비 -> `comparison`, architecture/system/flow/아키텍처/구조/시스템/흐름 -> `architecture`, visual/image/diagram/비주얼/이미지/다이어그램 -> `visual`; otherwise `--default-intent` is used (`policy` by default).
+
+```bash
+PYTHONPATH=src python -m slideforge.cli prepare-sections \
+  --source source.md \
+  --output runs/<run-id>-input/sections.json \
+  --default-intent policy
+```
+
+`prepare-deck` turns structured sections into an HtmlDeck-compatible JSON without calling providers or inventing unsupported claims. Sections are a JSON list with `id`, `heading`, `intent`, and optional list-of-string `bullets`; `--design-spec` may provide available archetypes, otherwise conservative intent aliases and `text_explainer` fallback are used.
 
 ```bash
 PYTHONPATH=src python -m slideforge.cli prepare-deck \
   --title "폐쇄망 AI 운영 전략" \
-  --sections sections.json \
+  --sections runs/<run-id>-input/sections.json \
   --output runs/<run-id>-input/deck.json
 ```
 

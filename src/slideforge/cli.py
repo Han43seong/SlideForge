@@ -33,6 +33,7 @@ from slideforge.schemas import (
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
 from slideforge.pptx_export import export_pptx_report
 from slideforge.run_pipeline import run_local
+from slideforge.section_preparer import write_prepared_sections
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -85,6 +86,15 @@ def _load_html_slide(raw: dict[str, Any]) -> HtmlSlide:
     payload["comparison_columns"] = [ComparisonColumn(**item) for item in payload.get("comparison_columns", [])]
     payload["comparison_rows"] = [ComparisonRow(**item) for item in payload.get("comparison_rows", [])]
     return HtmlSlide(**payload)
+
+
+def _cmd_prepare_sections(args: argparse.Namespace) -> int:
+    write_prepared_sections(
+        source=Path(args.source),
+        output=Path(args.output),
+        default_intent=args.default_intent,
+    )
+    return 0
 
 
 def _cmd_prepare_deck(args: argparse.Namespace) -> int:
@@ -225,6 +235,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="slideforge")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    prepare_sections = subparsers.add_parser(
+        "prepare-sections",
+        help="Prepare structured section JSON from local plain text or Markdown-like source material",
+    )
+    prepare_sections.add_argument("--source", required=True, help="Local plain text/Markdown-like source path")
+    prepare_sections.add_argument("--output", required=True, help="Prepared sections JSON output path")
+    prepare_sections.add_argument(
+        "--default-intent",
+        default="policy",
+        help="Fallback intent when no deterministic keyword alias matches; defaults to policy",
+    )
+    prepare_sections.set_defaults(func=_cmd_prepare_sections)
 
     prepare_deck = subparsers.add_parser(
         "prepare-deck",
