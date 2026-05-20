@@ -1,4 +1,4 @@
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
+from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
 
 
 def test_compose_html_deck_outputs_presentation_shell():
@@ -52,6 +52,41 @@ def test_compose_html_deck_renders_archetype_specific_sections():
     assert 'class="metric-table"' in html
     assert "정확도" in html
     assert "85%" in html
+
+
+def test_compose_html_deck_supports_structured_archetype_content():
+    deck = HtmlDeck(
+        title="structured deck",
+        slides=[
+            HtmlSlide(
+                slide_id="visual",
+                title="비주얼 밴드",
+                archetype="visual_band",
+                visual_chips=[VisualChip(label="Aurora", emphasis="cyan"), VisualChip(label="3D chip", emphasis="magenta")],
+            ),
+            HtmlSlide(
+                slide_id="timeline",
+                title="일정",
+                archetype="timeline",
+                timeline_steps=[TimelineStep(label="PoC", detail="0~30일"), TimelineStep(label="Pilot", detail="31~60일")],
+            ),
+            HtmlSlide(
+                slide_id="table",
+                title="KPI",
+                archetype="kpi_table",
+                metric_rows=[MetricRow(label="정확도", value="85%"), MetricRow(label="응답시간", value="2초")],
+            ),
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert 'data-emphasis="cyan"' in html
+    assert "0~30일" in html
+    assert "31~60일" in html
+    assert "정확도" in html
+    assert "85%" in html
+    assert "정확도 | 85%" not in html
 
 
 def test_compose_html_deck_escapes_user_content():

@@ -5,6 +5,38 @@ from html import escape
 
 
 @dataclass(frozen=True)
+class VisualChip:
+    label: str
+    emphasis: str = "neutral"
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("visual chip label is required")
+
+
+@dataclass(frozen=True)
+class TimelineStep:
+    label: str
+    detail: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("timeline step label is required")
+
+
+@dataclass(frozen=True)
+class MetricRow:
+    label: str
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise ValueError("metric row label is required")
+        if not self.value.strip():
+            raise ValueError("metric row value is required")
+
+
+@dataclass(frozen=True)
 class HtmlSlide:
     slide_id: str
     title: str
@@ -12,6 +44,9 @@ class HtmlSlide:
     bullets: list[str] = field(default_factory=list)
     archetype: str = "text_explainer"
     asset_path: str | None = None
+    visual_chips: list[VisualChip] = field(default_factory=list)
+    timeline_steps: list[TimelineStep] = field(default_factory=list)
+    metric_rows: list[MetricRow] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.slide_id.strip():
@@ -38,7 +73,11 @@ def _render_default_bullets(slide: HtmlSlide) -> str:
 
 
 def _render_visual_band(slide: HtmlSlide) -> str:
-    chips = "\n".join(f'          <span class="visual-chip">{escape(item)}</span>' for item in slide.bullets)
+    chip_items = slide.visual_chips or [VisualChip(label=item) for item in slide.bullets]
+    chips = "\n".join(
+        f'          <span class="visual-chip" data-emphasis="{escape(chip.emphasis)}">{escape(chip.label)}</span>'
+        for chip in chip_items
+    )
     return f'''\n      <div class="visual-band" aria-label="visual motifs">
         <div class="orb orb-cyan"></div>
         <div class="orb orb-magenta"></div>
@@ -51,26 +90,34 @@ def _render_visual_band(slide: HtmlSlide) -> str:
 
 def _render_timeline(slide: HtmlSlide) -> str:
     steps = []
-    total = max(len(slide.bullets), 1)
-    for idx, item in enumerate(slide.bullets, start=1):
+    step_items = slide.timeline_steps or [TimelineStep(label=item) for item in slide.bullets]
+    total = max(len(step_items), 1)
+    for idx, item in enumerate(step_items, start=1):
+        detail = f'<span class="timeline-detail">{escape(item.detail)}</span>' if item.detail else ""
         steps.append(
             f'''        <div class="timeline-step" style="--step:{idx}; --total:{total}">
           <span class="timeline-dot">{idx:02d}</span>
-          <span class="timeline-label">{escape(item)}</span>
+          <span class="timeline-label">{escape(item.label)}</span>{detail}
         </div>'''
         )
     return "\n      <div class=\"timeline-track\">\n" + "\n".join(steps) + "\n      </div>" if steps else ""
 
 
+def _metric_rows_from_bullets(bullets: list[str]) -> list[MetricRow]:
+    rows = []
+    for item in bullets:
+        label, sep, value = item.partition("|")
+        rows.append(MetricRow(label=label.strip(), value=value.strip() if sep else "—"))
+    return rows
+
+
 def _render_metric_table(slide: HtmlSlide) -> str:
     rows = []
-    for item in slide.bullets:
-        label, sep, value = item.partition("|")
-        value = value if sep else ""
+    for item in slide.metric_rows or _metric_rows_from_bullets(slide.bullets):
         rows.append(
             f'''        <tr>
-          <th>{escape(label.strip())}</th>
-          <td>{escape(value.strip())}</td>
+          <th>{escape(item.label)}</th>
+          <td>{escape(item.value)}</td>
         </tr>'''
         )
     return "\n      <table class=\"metric-table\">\n" + "\n".join(rows) + "\n      </table>" if rows else ""
@@ -121,12 +168,15 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .slide::before {{ content:""; position:absolute; inset:-20%; background:linear-gradient(120deg, transparent 20%, rgba(53,231,255,.18), rgba(255,79,216,.16), transparent 72%); filter:blur(26px); transform:rotate(-8deg); }}
     .asset {{ position:absolute; inset:0; background-size:cover; background-position:center; opacity:.74; mix-blend-mode:screen; }}
     .slide-content {{ position:relative; z-index:1; max-width:940px; }}
+    .slide[data-archetype="visual_band"] .slide-content, .slide[data-archetype="architecture_visual"] .slide-content, .slide[data-archetype="cover"] .slide-content {{ position:static; max-width:500px; }}
+    .slide[data-archetype="visual_band"] .eyebrow, .slide[data-archetype="visual_band"] h1, .slide[data-archetype="visual_band"] .subtitle, .slide[data-archetype="architecture_visual"] .eyebrow, .slide[data-archetype="architecture_visual"] h1, .slide[data-archetype="architecture_visual"] .subtitle, .slide[data-archetype="cover"] .eyebrow, .slide[data-archetype="cover"] h1, .slide[data-archetype="cover"] .subtitle {{ position:relative; z-index:2; max-width:500px; }}
     .eyebrow {{ color:var(--cyan); letter-spacing:.18em; font-size:18px; font-weight:800; margin-bottom:28px; }}
     h1 {{ margin:0; font-size:68px; line-height:1.03; letter-spacing:-.04em; text-wrap:balance; }}
+    .slide[data-archetype="visual_band"] h1, .slide[data-archetype="architecture_visual"] h1, .slide[data-archetype="cover"] h1 {{ font-size:54px; line-height:1.08; }}
     .subtitle {{ color:var(--muted); font-size:28px; margin:22px 0 0; }}
     ul {{ margin:40px 0 0; padding:0; list-style:none; display:grid; gap:16px; }}
     li {{ max-width:760px; padding:18px 22px; border:1px solid rgba(53,231,255,.28); border-radius:18px; background:rgba(255,255,255,.055); font-size:24px; }}
-    .visual-band {{ position:absolute; right:72px; bottom:88px; width:46%; height:42%; border:1px solid rgba(53,231,255,.24); border-radius:32px; background:linear-gradient(135deg, rgba(53,231,255,.12), rgba(255,79,216,.11)); overflow:hidden; box-shadow:0 24px 90px rgba(0,0,0,.35); }}
+    .visual-band {{ position:absolute; right:72px; bottom:92px; width:38%; height:24%; border:1px solid rgba(53,231,255,.24); border-radius:32px; background:linear-gradient(135deg, rgba(53,231,255,.12), rgba(255,79,216,.11)); overflow:hidden; box-shadow:0 24px 90px rgba(0,0,0,.35); }}
     .orb {{ position:absolute; width:180px; height:180px; border-radius:999px; filter:blur(6px); opacity:.78; }}
     .orb-cyan {{ right:18%; top:8%; background:radial-gradient(circle, rgba(53,231,255,.95), rgba(53,231,255,.08) 64%, transparent 70%); }}
     .orb-magenta {{ left:10%; bottom:2%; background:radial-gradient(circle, rgba(255,79,216,.82), rgba(255,79,216,.08) 64%, transparent 70%); }}
@@ -137,7 +187,8 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .timeline-track::before {{ content:""; position:absolute; left:0; right:0; top:31px; height:2px; background:linear-gradient(90deg, var(--cyan), var(--magenta)); opacity:.62; }}
     .timeline-step {{ position:relative; padding-top:76px; }}
     .timeline-dot {{ position:absolute; top:0; left:0; width:62px; height:62px; border-radius:18px; display:grid; place-items:center; background:linear-gradient(135deg, var(--cyan), var(--magenta)); color:#02030a; font-weight:900; box-shadow:0 14px 42px rgba(53,231,255,.22); }}
-    .timeline-label {{ display:block; padding:18px; min-height:88px; border-radius:18px; background:rgba(255,255,255,.065); border:1px solid rgba(255,255,255,.12); font-size:22px; }}
+    .timeline-label {{ display:block; padding:18px 18px 8px; min-height:62px; border-radius:18px 18px 0 0; background:rgba(255,255,255,.065); border:1px solid rgba(255,255,255,.12); border-bottom:0; font-size:22px; }}
+    .timeline-detail {{ display:block; padding:0 18px 18px; border-radius:0 0 18px 18px; background:rgba(255,255,255,.065); border:1px solid rgba(255,255,255,.12); border-top:0; color:var(--muted); font-size:17px; }}
     .metric-table {{ margin-top:42px; border-collapse:separate; border-spacing:0 12px; min-width:720px; max-width:940px; }}
     .metric-table th, .metric-table td {{ padding:20px 24px; background:rgba(255,255,255,.07); border-top:1px solid rgba(53,231,255,.18); border-bottom:1px solid rgba(53,231,255,.18); font-size:24px; }}
     .metric-table th {{ text-align:left; color:#dff9ff; border-left:1px solid rgba(53,231,255,.18); border-radius:18px 0 0 18px; }}

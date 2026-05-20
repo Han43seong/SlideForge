@@ -10,7 +10,7 @@ from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
+from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -49,8 +49,16 @@ def _load_mappings(path: Path) -> list[ArchetypeMapping]:
 
 def _load_html_deck(path: Path) -> HtmlDeck:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    slides = [HtmlSlide(**item) for item in raw.get("slides", [])]
+    slides = [_load_html_slide(item) for item in raw.get("slides", [])]
     return HtmlDeck(title=raw["title"], slides=slides)
+
+
+def _load_html_slide(raw: dict[str, Any]) -> HtmlSlide:
+    payload = dict(raw)
+    payload["visual_chips"] = [VisualChip(**item) for item in payload.get("visual_chips", [])]
+    payload["timeline_steps"] = [TimelineStep(**item) for item in payload.get("timeline_steps", [])]
+    payload["metric_rows"] = [MetricRow(**item) for item in payload.get("metric_rows", [])]
+    return HtmlSlide(**payload)
 
 
 def _cmd_build_spec(args: argparse.Namespace) -> int:

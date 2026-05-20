@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
+from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, MetricRow, TimelineStep, VisualChip, compose_html_deck
 from slideforge.run_manifest import EvidenceArtifact, RunManifest, RunManifestWriter
 
 
@@ -15,10 +15,18 @@ class SmokeDeckInput:
     slides: list[dict[str, Any]]
 
     def to_html_deck(self) -> HtmlDeck:
-        return HtmlDeck(title=self.title, slides=[HtmlSlide(**slide) for slide in self.slides])
+        return HtmlDeck(title=self.title, slides=[_load_smoke_slide(slide) for slide in self.slides])
 
     def to_dict(self) -> dict[str, Any]:
         return {"title": self.title, "slides": self.slides}
+
+
+def _load_smoke_slide(raw: dict[str, Any]) -> HtmlSlide:
+    payload = dict(raw)
+    payload["visual_chips"] = [VisualChip(**item) for item in payload.get("visual_chips", [])]
+    payload["timeline_steps"] = [TimelineStep(**item) for item in payload.get("timeline_steps", [])]
+    payload["metric_rows"] = [MetricRow(**item) for item in payload.get("metric_rows", [])]
+    return HtmlSlide(**payload)
 
 
 def write_smoke_run(root: str | Path, run_id: str, deck: SmokeDeckInput) -> Path:
