@@ -81,6 +81,36 @@ def test_cli_generate_asset_briefs_writes_comfyui_payload(tmp_path):
     assert data["briefs"][1]["text_policy"] == "text-free"
 
 
+def test_cli_compose_html_writes_presentation_file(tmp_path):
+    deck_path = tmp_path / "deck.json"
+    output_path = tmp_path / "deck.html"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "폐쇄망 LLM 전략",
+                "slides": [
+                    {
+                        "slide_id": "s1",
+                        "title": "폐쇄망 LLM 전략",
+                        "subtitle": "의사결정용",
+                        "bullets": ["GPU", "RAG"],
+                        "archetype": "cover",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(["compose-html", "--deck", str(deck_path), "--output", str(output_path)])
+
+    assert exit_code == 0
+    html = output_path.read_text(encoding="utf-8")
+    assert "<!doctype html>" in html
+    assert "function showSlide" in html
+    assert "폐쇄망 LLM 전략" in html
+
+
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"
 

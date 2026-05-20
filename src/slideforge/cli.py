@@ -9,6 +9,7 @@ from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
+from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, compose_html_deck
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
 
@@ -44,6 +45,12 @@ def _load_mappings(path: Path) -> list[ArchetypeMapping]:
     return [ArchetypeMapping(**item) for item in raw]
 
 
+def _load_html_deck(path: Path) -> HtmlDeck:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    slides = [HtmlSlide(**item) for item in raw.get("slides", [])]
+    return HtmlDeck(title=raw["title"], slides=slides)
+
+
 def _cmd_build_spec(args: argparse.Namespace) -> int:
     observations = _load_observations(Path(args.observations))
     spec = build_design_spec_from_observations(args.name, observations)
@@ -56,6 +63,14 @@ def _cmd_generate_asset_briefs(args: argparse.Namespace) -> int:
     mappings = _load_mappings(Path(args.mappings))
     brief_set = generate_asset_briefs(spec, mappings)
     _write_json(Path(args.output), brief_set.to_comfyui_queue_payload(seed=args.seed))
+    return 0
+
+
+def _cmd_compose_html(args: argparse.Namespace) -> int:
+    deck = _load_html_deck(Path(args.deck))
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(compose_html_deck(deck), encoding="utf-8")
     return 0
 
 
@@ -94,6 +109,11 @@ def build_parser() -> argparse.ArgumentParser:
     asset_briefs.add_argument("--output", required=True)
     asset_briefs.add_argument("--seed", type=int)
     asset_briefs.set_defaults(func=_cmd_generate_asset_briefs)
+
+    compose_html = subparsers.add_parser("compose-html", help="Compose a guizang-style HTML presentation")
+    compose_html.add_argument("--deck", required=True)
+    compose_html.add_argument("--output", required=True)
+    compose_html.set_defaults(func=_cmd_compose_html)
 
     score = subparsers.add_parser("score-fidelity", help="Write a 100-point fidelity score report")
     score.add_argument("--background", type=int, required=True)
