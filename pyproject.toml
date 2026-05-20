@@ -5,6 +5,9 @@ description = "High-fidelity slide generation pipeline with ComfyUI assets, guiz
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+slideforge = "slideforge.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 

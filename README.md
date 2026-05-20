@@ -92,3 +92,19 @@ Optional PPTX Delivery
 ## First milestone
 
 Phase 1 should prove that this repository can take a graphic-heavy design reference, generate or define appropriate visual asset briefs, compose a high-fidelity HTML presentation with `codex-guizang-html`, and score template similarity with a 100-point fidelity rubric.
+
+Current Phase 1 primitives:
+
+- `slideforge.design_spec` — structured colors, typography, slide archetypes, background layers, and graphic motifs.
+- `slideforge.template_analyzer` — converts template observations into a design spec.
+- `slideforge.archetype_mapper` — maps content sections to template-like slide archetypes.
+- `slideforge.asset_brief` — defines text-free ComfyUI asset briefs.
+- `slideforge.fidelity_scorer` — scores output fidelity with the 100-point rubric.
+- `slideforge.cli` — writes design-spec and fidelity-score JSON artifacts.
+
+Example local checks:
+
+```bash
+PYTHONPATH=src python -m pytest -q
+PYTHONPATH=src python -m slideforge.cli --help
+```
