@@ -63,6 +63,25 @@ PPTX route for:
 PPTX outputs require a visual render gate before final acceptance. SlideForge now writes a dependency-free `pptx-delivery-gate.json` contract for smoke runs or via `slideforge pptx-delivery-gate`; this records the source deck, desired PPTX path, available local validation tools, static/visual checks planned, status (`available`, `unavailable`, or `pending`), and blockers. The gate is strategy evidence only and does not claim PPTX export or visual rendering occurred.
 
 
+
+## ComfyUI handoff report
+
+`generate-asset-briefs` produces the text-free payload consumed by the ComfyUI handoff seam. `comfyui-handoff` writes evidence for an already-running ComfyUI-compatible REST endpoint without installing ComfyUI, downloading models, or claiming image generation when no output file exists.
+
+```bash
+PYTHONPATH=src python -m slideforge.cli generate-asset-briefs \
+  --design-spec design-spec.json \
+  --mappings mappings.json \
+  --output runs/<run-id>/asset-briefs.json
+
+PYTHONPATH=src python -m slideforge.cli comfyui-handoff \
+  --asset-briefs runs/<run-id>/asset-briefs.json \
+  --output-dir runs/<run-id> \
+  --endpoint http://127.0.0.1:8188
+```
+
+The report records `provider`, `endpoint`, `status`, `server_available`, `workflow_path`, `generated_assets`, `pending_assets`, `failed_assets`, `blockers`, and `checked_at`. Optional submission is explicit: provide `--workflow workflow-api.json --execute`. Submitted prompts remain pending until concrete output files exist at their `output_hint`; Korean text, numbers, labels, charts, and PPTX structure stay owned by deterministic SlideForge composition.
+
 ## Real browser screenshot capture
 
 `smoke-html` still writes the dependency-free `browser-regression-plan.json`. For real PNG evidence, install the optional browser extra and Chromium, then run the Playwright Chromium capture command against a generated HTML deck:

@@ -8,6 +8,11 @@ from typing import Any
 from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
 from slideforge.browser_capture import capture_html_deck_screenshots
+from slideforge.comfyui_handoff import (
+    DEFAULT_COMFYUI_ENDPOINT,
+    DEFAULT_REPORT_NAME,
+    write_comfyui_handoff_report,
+)
 from slideforge.design_spec import ColorToken, DesignSpec, SlideArchetype, TypographyToken
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
@@ -111,6 +116,19 @@ def _cmd_smoke_html(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_comfyui_handoff(args: argparse.Namespace) -> int:
+    write_comfyui_handoff_report(
+        asset_briefs_path=Path(args.asset_briefs),
+        output_dir=Path(args.output_dir),
+        endpoint=args.endpoint,
+        workflow_path=Path(args.workflow) if args.workflow else None,
+        report_name=args.report_name,
+        execute=args.execute,
+        timeout_seconds=args.timeout,
+    )
+    return 0
+
+
 def _cmd_capture_screenshots(args: argparse.Namespace) -> int:
     viewport = {"width": args.viewport_width, "height": args.viewport_height}
     capture_html_deck_screenshots(
@@ -178,6 +196,23 @@ def build_parser() -> argparse.ArgumentParser:
     compose_html.add_argument("--deck", required=True)
     compose_html.add_argument("--output", required=True)
     compose_html.set_defaults(func=_cmd_compose_html)
+
+    comfyui = subparsers.add_parser(
+        "comfyui-handoff",
+        help="Write an honest ComfyUI asset handoff report and optionally submit to an already-running REST endpoint",
+    )
+    comfyui.add_argument("--asset-briefs", required=True, help="JSON payload from generate-asset-briefs")
+    comfyui.add_argument("--output-dir", required=True, help="Directory for the handoff report")
+    comfyui.add_argument("--endpoint", default=DEFAULT_COMFYUI_ENDPOINT)
+    comfyui.add_argument("--workflow", help="Optional ComfyUI workflow API JSON to submit when --execute is set")
+    comfyui.add_argument("--report-name", default=DEFAULT_REPORT_NAME)
+    comfyui.add_argument(
+        "--execute",
+        action="store_true",
+        help="Submit prompts only when endpoint health succeeds and --workflow is provided",
+    )
+    comfyui.add_argument("--timeout", type=float, default=1.0, help="HTTP health/submit timeout in seconds")
+    comfyui.set_defaults(func=_cmd_comfyui_handoff)
 
     smoke_html = subparsers.add_parser("smoke-html", help="Write a compose-html smoke run with manifest/evidence artifacts")
     smoke_html.add_argument("--deck", required=True)

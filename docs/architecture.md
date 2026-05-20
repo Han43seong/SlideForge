@@ -17,7 +17,7 @@ src/slideforge/
   design_spec.py             # structured color/layout/type/style rules
   archetype_mapper.py        # map source content to template-like slide archetypes
   asset_brief.py             # generate text-free asset briefs for ComfyUI
-  comfy_asset_forge.py       # integration boundary for ComfyUI workflows
+  comfyui_handoff.py         # evidence-first ComfyUI REST handoff/report seam
   guizang_html_composer.py   # primary HTML deck composition route
   pptx_delivery.py           # PPTX output route and template-native adapter
   fidelity_scorer.py         # 100-point template similarity scoring
@@ -65,6 +65,7 @@ Interpretation:
 2. Build a deep design analysis and design spec.
 3. Map content into slide archetypes.
 4. Create ComfyUI asset briefs for text-free backgrounds and 3D art.
-5. Compose an HTML presentation through the guizang route.
-6. Score template similarity and readability.
-7. If required, deliver PPTX through the presentation-pptx route.
+5. Write a ComfyUI handoff report; optionally submit a workflow API JSON to an already-running local endpoint while treating queued work as pending until files exist.
+6. Compose an HTML presentation through the guizang route.
+7. Score template similarity and readability.
+8. If required, deliver PPTX through the presentation-pptx route.
