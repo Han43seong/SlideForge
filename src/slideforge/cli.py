@@ -31,6 +31,7 @@ from slideforge.schemas import (
 )
 from slideforge.pptx_delivery_gate import write_pptx_delivery_gate
 from slideforge.pptx_export import export_pptx_report
+from slideforge.run_pipeline import run_local
 from slideforge.smoke_run import SmokeDeckInput, write_smoke_run
 from slideforge.template_analyzer import TemplateObservation, build_design_spec_from_observations
 
@@ -174,6 +175,18 @@ def _cmd_summarize_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_run_local(args: argparse.Namespace) -> int:
+    report = run_local(
+        deck=Path(args.deck),
+        runs_dir=Path(args.runs_dir),
+        run_id=args.run_id,
+        summary_output=Path(args.summary_output) if args.summary_output else None,
+        summary_markdown_output=Path(args.summary_markdown_output) if args.summary_markdown_output else None,
+    )
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def _cmd_score_fidelity(args: argparse.Namespace) -> int:
     score = score_fidelity(
         FidelityScoreInput(
@@ -274,6 +287,20 @@ def build_parser() -> argparse.ArgumentParser:
     pptx_gate.add_argument("--run-id", default="")
     pptx_gate.add_argument("--report-name", default="pptx-delivery-gate.json")
     pptx_gate.set_defaults(func=_cmd_pptx_delivery_gate)
+
+    run_local_parser = subparsers.add_parser(
+        "run-local",
+        help="Create a dependency-free local evidence run and operator summary from a deck JSON",
+    )
+    run_local_parser.add_argument("--deck", required=True, help="HtmlDeck-compatible deck JSON")
+    run_local_parser.add_argument("--runs-dir", default="runs", help="Runs root directory; defaults to ./runs")
+    run_local_parser.add_argument("--run-id", required=True, help="Deterministic run identifier")
+    run_local_parser.add_argument("--summary-output", help="JSON summary output; defaults to <run-dir>/run-summary.json")
+    run_local_parser.add_argument(
+        "--summary-markdown-output",
+        help="Markdown summary output; defaults to <run-dir>/run-summary.md",
+    )
+    run_local_parser.set_defaults(func=_cmd_run_local)
 
     summarize = subparsers.add_parser("summarize-run", help="Aggregate run artifacts into an operator evidence summary")
     summarize.add_argument("--run-dir", required=True, help="Directory containing SlideForge run artifacts")

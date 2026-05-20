@@ -111,6 +111,17 @@ PYTHONPATH=src python -m slideforge.cli capture-screenshots \
 
 The runner writes `browser-regression-report.json` plus `slide-XX.png` files. The report records `capture_mode: real_playwright_chromium`, detected slide count, viewport, browser name, console errors, capture status, and per-slide ids/archetypes when the HTML exposes `data-slide-id` and `data-archetype`.
 
+## Local deterministic handoff runner
+
+`run-local` is the one-command local operator handoff path for an existing HtmlDeck-compatible JSON deck. It is dependency-free: it writes the smoke HTML run, manifest/evidence index, browser regression plan, PPTX delivery gate, and default `run-summary.json` plus `run-summary.md` in the run directory. It does not perform final visual, PPTX render, or ComfyUI acceptance; those remain warnings/next actions until real evidence artifacts are attached.
+
+```bash
+PYTHONPATH=src python -m slideforge.cli run-local \
+  --deck deck.json \
+  --runs-dir runs \
+  --run-id <run-id>
+```
+
 ## Run evidence summary
 
 `summarize-run` aggregates existing run artifacts into one operator-readable JSON report and, when requested, a plain Markdown report. It is dependency-free and evidence-first: missing optional artifacts become warnings or pending next actions, and reports never claim browser, PPTX, or ComfyUI evidence unless the corresponding artifact records it.
