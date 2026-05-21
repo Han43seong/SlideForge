@@ -270,6 +270,11 @@ def _render_archetype_body(slide: HtmlSlide) -> str:
 
 
 def _render_slide(slide: HtmlSlide, index: int, total: int) -> str:
+    if slide.archetype == "architecture_visual" and slide.asset_path:
+        return f'''    <section class="slide architecture-diagram-slide" data-slide-id="{escape(slide.slide_id)}" data-archetype="{escape(slide.archetype)}">
+      <img class="asset-diagram" src="{escape(slide.asset_path)}" alt="{escape(slide.title)}" />
+      <div class="page-count">{index} / {total}</div>
+    </section>'''
     subtitle = f'<p class="subtitle">{escape(slide.subtitle)}</p>' if slide.subtitle else ""
     body = _render_archetype_body(slide)
     asset_style = ""
@@ -303,6 +308,11 @@ def compose_html_deck(deck: HtmlDeck) -> str:
     .slide.active {{ display:block; }}
     .slide::before {{ content:""; position:absolute; inset:-20%; background:linear-gradient(120deg, transparent 20%, rgba(53,231,255,.18), rgba(255,79,216,.16), transparent 72%); filter:blur(26px); transform:rotate(-8deg); }}
     .asset {{ position:absolute; inset:0; background-size:cover; background-position:center; opacity:.74; mix-blend-mode:screen; }}
+    .architecture-diagram-slide {{ padding:0; display:none; background:#02030a; }}
+    .architecture-diagram-slide.active {{ display:block; }}
+    .architecture-diagram-slide::before {{ display:none; }}
+    .asset-diagram {{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }}
+    .architecture-diagram-slide .page-count {{ position:absolute; right:32px; bottom:24px; z-index:2; color:rgba(247,251,255,.72); font-size:16px; font-weight:700; }}
     .slide-content {{ position:relative; z-index:1; max-width:940px; }}
     .slide[data-archetype="visual_band"] .slide-content, .slide[data-archetype="architecture_visual"] .slide-content, .slide[data-archetype="cover"] .slide-content {{ position:static; max-width:500px; }}
     .slide[data-archetype="visual_band"] .eyebrow, .slide[data-archetype="visual_band"] h1, .slide[data-archetype="visual_band"] .subtitle, .slide[data-archetype="architecture_visual"] .eyebrow, .slide[data-archetype="architecture_visual"] h1, .slide[data-archetype="architecture_visual"] .subtitle, .slide[data-archetype="cover"] .eyebrow, .slide[data-archetype="cover"] h1, .slide[data-archetype="cover"] .subtitle {{ position:relative; z-index:2; max-width:500px; }}

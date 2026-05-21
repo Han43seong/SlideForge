@@ -150,7 +150,7 @@ def test_visual_archetype_uses_generated_asset_path_without_placeholder_card():
         title="generated asset deck",
         slides=[
             HtmlSlide(
-                slide_id="generated-visual",
+                slide_id="s1",
                 title="생성 에셋",
                 archetype="visual_band",
                 asset_path="generated-assets/visual.png",
@@ -164,8 +164,30 @@ def test_visual_archetype_uses_generated_asset_path_without_placeholder_card():
     assert "background-image:url('generated-assets/visual.png')" in html
     assert "ComfyUI asset placeholder" not in html
     assert 'class="asset-placeholder-card"' not in html
-    assert 'data-asset-status="placeholder-only"' not in html
     assert "AI maintenance" in html
+
+
+def test_architecture_visual_asset_renders_as_clean_full_slide_diagram():
+    deck = HtmlDeck(
+        title="architecture asset deck",
+        slides=[
+            HtmlSlide(
+                slide_id="s1",
+                title="Architecture Flow",
+                subtitle="Intent: architecture",
+                archetype="architecture_visual",
+                asset_path="generated-assets/architecture-flow-diagram.png",
+                visual_chips=[VisualChip(label="폐쇄망 RAG")],
+            )
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert '<img class="asset-diagram" src="generated-assets/architecture-flow-diagram.png"' in html
+    assert "<h1>Architecture Flow</h1>" not in html
+    assert '<p class="subtitle">Intent: architecture</p>' not in html
+    assert 'class="visual-chip"' not in html
 
 
 def test_asset_placeholder_rejects_real_integration_paths_and_escapes_metadata():

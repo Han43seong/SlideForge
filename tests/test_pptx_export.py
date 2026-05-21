@@ -3,7 +3,7 @@ import json
 import tomllib
 import zipfile
 
-from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide
+from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide, VisualChip
 from slideforge.pptx_export import PptxRendererEvidence, export_pptx_report
 from slideforge.pptx_delivery_gate import ToolAvailability
 
@@ -202,3 +202,39 @@ def test_export_pptx_omits_visual_placeholder_label_when_asset_is_embedded(tmp_p
         slide_xml = pptx.read("ppt/slides/slide1.xml").decode("utf-8")
     assert "Visual asset placeholder" not in slide_xml
     assert "deterministic text overlay" not in slide_xml
+
+
+def test_export_pptx_architecture_asset_omits_overlay_title_and_chips(tmp_path, monkeypatch):
+    monkeypatch.setattr("slideforge.pptx_export.PptxRendererEvidence.detect", lambda: PptxRendererEvidence(
+        strategy="pptx_glimpse_available_for_renderer_evidence",
+        status="available",
+        tool={"name": "pptx_glimpse", "executable": "pptx-glimpse", "available": True, "path": "pptx-glimpse"},
+        blockers=[],
+    ))
+    (tmp_path / "generated-assets").mkdir()
+    (tmp_path / "generated-assets" / "diagram.png").write_bytes(base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    ))
+    deck = HtmlDeck(
+        title="asset deck",
+        slides=[
+            HtmlSlide(
+                slide_id="s1",
+                title="Architecture Flow",
+                subtitle="Intent: architecture",
+                archetype="architecture_visual",
+                asset_path="generated-assets/diagram.png",
+                visual_chips=[VisualChip(label="폐쇄망 RAG")],
+            )
+        ],
+    )
+    output = tmp_path / "deck.pptx"
+
+    report = export_pptx_report(deck, output, tmp_path / "report.json", run_id="diagram-smoke")
+
+    assert report["embedded_asset_count"] == 1
+    with zipfile.ZipFile(output) as pptx:
+        slide_xml = pptx.read("ppt/slides/slide1.xml").decode("utf-8")
+    assert "Architecture Flow" not in slide_xml
+    assert "Intent: architecture" not in slide_xml
+    assert "폐쇄망 RAG" not in slide_xml

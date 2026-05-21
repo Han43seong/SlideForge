@@ -202,6 +202,12 @@ def _export_with_python_pptx(deck: HtmlDeck, output: Path) -> dict[str, Any]:
     for index, source in enumerate(deck.slides, start=1):
         slide = prs.slides.add_slide(blank)
         _add_background(slide, prs, RGBColor)
+        if source.archetype == "architecture_visual" and source.asset_path:
+            embedded, missing = _add_generated_asset_image(slide, source, output.parent, Inches, full_slide=True)
+            embedded_asset_count += embedded
+            missing_asset_paths.extend(missing)
+            _add_textbox(slide, f"{index:02d} / {total:02d}", Inches(11.35), Inches(6.95), Inches(1.2), Inches(0.28), Pt(10), color="F7FBFF", bold=True)
+            continue
         _add_textbox(slide, source.title, Inches(0.7), Inches(0.74), Inches(6.7), Inches(1.0), Pt(32), bold=True)
         if source.subtitle:
             _add_textbox(slide, source.subtitle, Inches(0.74), Inches(1.55), Inches(6.8), Inches(0.45), Pt(16), color="9EB6CC")
@@ -266,14 +272,23 @@ def _add_archetype_content(slide: Any, source: HtmlSlide, inches: Any, pt: Any, 
         _add_bullets(slide, source.bullets, inches(0.9), inches(2.25), inches(7.2), inches(4.1), pt(18))
 
 
-def _add_generated_asset_image(slide: Any, source: HtmlSlide, base_dir: Path, inches: Any) -> tuple[int, list[str]]:
+def _add_generated_asset_image(
+    slide: Any,
+    source: HtmlSlide,
+    base_dir: Path,
+    inches: Any,
+    full_slide: bool = False,
+) -> tuple[int, list[str]]:
     if source.archetype not in {"cover", "visual_band", "architecture_visual"} or not source.asset_path:
         return 0, []
     asset = Path(source.asset_path)
     resolved = asset if asset.is_absolute() else base_dir / asset
     if not resolved.exists():
         return 0, [source.asset_path]
-    slide.shapes.add_picture(str(resolved), inches(7.15), inches(1.75), width=inches(5.35), height=inches(3.25))
+    if full_slide:
+        slide.shapes.add_picture(str(resolved), 0, 0, width=inches(13.333), height=inches(7.5))
+    else:
+        slide.shapes.add_picture(str(resolved), inches(7.15), inches(1.75), width=inches(5.35), height=inches(3.25))
     return 1, []
 
 
