@@ -96,6 +96,42 @@ PYTHONPATH=src python -m slideforge.cli comfyui-handoff \
 
 The report records `provider`, `endpoint`, `status`, `server_available`, `workflow_path`, `generated_assets`, `pending_assets`, `failed_assets`, `blockers`, and `checked_at`. Optional submission is explicit: provide `--workflow workflow-api.json --execute`. Submitted prompts remain pending until concrete output files exist at their `output_hint`; Korean text, numbers, labels, charts, and PPTX structure stay owned by deterministic SlideForge composition.
 
+## Visual asset approval gate
+
+ComfyUI can remain the primary visual review UI when the operator is at the local PC. SlideForge treats ComfyUI UI, an HTML review board, or messaging review as interchangeable ways to inspect candidates; the durable source of truth is always `approved-assets.json`.
+
+```text
+ComfyUI UI / review board / Telegram selection
+  -> approve-assets
+  -> approved-assets.json
+  -> apply-approved-assets
+  -> deck.approved.json
+  -> run-local / HTML / PPTX / evidence
+```
+
+Record a ComfyUI UI selection from an asset candidate report:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli approve-assets \
+  --candidates runs/<run-id>/asset-generation-report.json \
+  --selection "slide-01=B,slide-03=A" \
+  --output runs/<run-id>/approved-assets.json \
+  --approved-by user \
+  --approval-mode explicit_user
+```
+
+Apply only approved assets to the deck:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli apply-approved-assets \
+  --deck runs/<run-id>/deck.json \
+  --approved-assets runs/<run-id>/approved-assets.json \
+  --output runs/<run-id>/deck.approved.json \
+  --report-output runs/<run-id>/approved-asset-application-report.json
+```
+
+`approve-assets` validates selected candidate ids and asset files, then records `approved_by`, `approval_mode` (`explicit_user`, `jarvis_recommended`, or `autonomous`), candidate source, and selected asset paths. `apply-approved-assets` writes a new deck JSON with `asset_path` applied only to matching approved slide ids and records unmatched approvals in the application report.
+
 ## Real browser screenshot capture
 
 `smoke-html` still writes the dependency-free `browser-regression-plan.json`. For real PNG evidence, install the optional browser extra and Chromium, then run the Playwright Chromium capture command against a generated HTML deck:

@@ -245,6 +245,131 @@ def test_cli_export_evidence_pack_writes_zip(tmp_path):
     assert data["summary_status"] == "needs_visual_evidence"
     assert data["artifacts"][0]["sha256"]
 
+def test_cli_approve_assets_records_comfyui_ui_selection(tmp_path):
+    candidate = tmp_path / "generated-assets" / "candidates" / "slide-01-b.png"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"fake-png")
+    candidates_path = tmp_path / "asset-generation-report.json"
+    candidates_path.write_text(
+        json.dumps(
+            {
+                "report_kind": "asset_generation_report",
+                "run_id": "asset-gate-smoke",
+                "candidates": [
+                    {
+                        "slide_id": "slide-01",
+                        "candidate_id": "B",
+                        "asset_path": str(candidate),
+                        "source": "comfyui_ui",
+                        "status": "generated",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "approved-assets.json"
+
+    exit_code = main(
+        [
+            "approve-assets",
+            "--candidates",
+            str(candidates_path),
+            "--selection",
+            "slide-01=B",
+            "--output",
+            str(output_path),
+            "--approved-by",
+            "user",
+            "--approval-mode",
+            "explicit_user",
+        ]
+    )
+
+    assert exit_code == 0
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert data["report_kind"] == "approved_assets"
+    assert data["run_id"] == "asset-gate-smoke"
+    assert data["approval_status"] == "approved"
+    assert data["approved_assets"] == [
+        {
+            "slide_id": "slide-01",
+            "selected_candidate": "B",
+            "asset_path": str(candidate),
+            "approved_by": "user",
+            "approval_mode": "explicit_user",
+            "notes": "",
+            "source": "comfyui_ui",
+        }
+    ]
+    assert data["regeneration_requests"] == []
+
+
+def test_cli_apply_approved_assets_writes_deck_with_only_selected_assets(tmp_path):
+    selected_asset = tmp_path / "generated-assets" / "candidates" / "slide-01-b.png"
+    selected_asset.parent.mkdir(parents=True)
+    selected_asset.write_bytes(b"fake-png")
+    deck_path = tmp_path / "deck.json"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "Asset approval deck",
+                "slides": [
+                    {"slide_id": "slide-01", "title": "Cover", "archetype": "cover"},
+                    {"slide_id": "slide-02", "title": "Text", "archetype": "text_explainer"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path = tmp_path / "approved-assets.json"
+    approved_path.write_text(
+        json.dumps(
+            {
+                "report_kind": "approved_assets",
+                "run_id": "asset-gate-smoke",
+                "approval_status": "approved",
+                "approved_assets": [
+                    {
+                        "slide_id": "slide-01",
+                        "selected_candidate": "B",
+                        "asset_path": str(selected_asset),
+                        "approved_by": "user",
+                        "approval_mode": "explicit_user",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "deck.approved.json"
+    report_path = tmp_path / "approved-asset-application-report.json"
+
+    exit_code = main(
+        [
+            "apply-approved-assets",
+            "--deck",
+            str(deck_path),
+            "--approved-assets",
+            str(approved_path),
+            "--output",
+            str(output_path),
+            "--report-output",
+            str(report_path),
+        ]
+    )
+
+    assert exit_code == 0
+    deck = json.loads(output_path.read_text(encoding="utf-8"))
+    assert deck["slides"][0]["asset_path"] == str(selected_asset)
+    assert "asset_path" not in deck["slides"][1]
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["report_kind"] == "approved_asset_application"
+    assert report["applied_asset_count"] == 1
+    assert report["unmatched_approved_slide_ids"] == []
+    assert report["deck_output"] == str(output_path)
+
+
 def test_cli_score_fidelity_writes_report_json(tmp_path):
     output_path = tmp_path / "score.json"
 

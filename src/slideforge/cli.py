@@ -7,6 +7,7 @@ from typing import Any
 
 from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
+from slideforge.asset_approval import apply_approved_assets, write_approved_assets
 from slideforge.browser_capture import capture_html_deck_screenshots
 from slideforge.comfyui_handoff import (
     DEFAULT_COMFYUI_ENDPOINT,
@@ -212,6 +213,30 @@ def _cmd_export_evidence_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_approve_assets(args: argparse.Namespace) -> int:
+    payload = write_approved_assets(
+        candidates_path=Path(args.candidates),
+        selection=args.selection,
+        output=Path(args.output),
+        approved_by=args.approved_by,
+        approval_mode=args.approval_mode,
+        notes=args.notes,
+    )
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
+def _cmd_apply_approved_assets(args: argparse.Namespace) -> int:
+    report = apply_approved_assets(
+        deck_path=Path(args.deck),
+        approved_assets_path=Path(args.approved_assets),
+        output=Path(args.output),
+        report_output=Path(args.report_output) if args.report_output else None,
+    )
+    print(json.dumps(report, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
 def _cmd_run_design_source_local(args: argparse.Namespace) -> int:
     report = run_design_source_local(
         source=Path(args.source),
@@ -392,6 +417,36 @@ def build_parser() -> argparse.ArgumentParser:
     export_pack.add_argument("--output", required=True, help="Output .zip path; must be outside --run-dir")
     export_pack.add_argument("--manifest-output", help="Optional sidecar manifest JSON path; must be outside --run-dir")
     export_pack.set_defaults(func=_cmd_export_evidence_pack)
+
+    approve_assets = subparsers.add_parser(
+        "approve-assets",
+        help="Record explicit/JARVIS/autonomous visual asset approvals from generated candidate images",
+    )
+    approve_assets.add_argument("--candidates", required=True, help="Asset candidate generation report JSON")
+    approve_assets.add_argument(
+        "--selection",
+        required=True,
+        help="Comma-separated slide_id=candidate_id selections, e.g. slide-01=B,slide-03=A",
+    )
+    approve_assets.add_argument("--output", required=True, help="approved-assets.json output path")
+    approve_assets.add_argument("--approved-by", default="user")
+    approve_assets.add_argument(
+        "--approval-mode",
+        default="explicit_user",
+        choices=["explicit_user", "jarvis_recommended", "autonomous"],
+    )
+    approve_assets.add_argument("--notes", default="")
+    approve_assets.set_defaults(func=_cmd_approve_assets)
+
+    apply_assets = subparsers.add_parser(
+        "apply-approved-assets",
+        help="Apply approved visual asset paths to an HtmlDeck-compatible deck JSON",
+    )
+    apply_assets.add_argument("--deck", required=True, help="Input HtmlDeck-compatible deck JSON")
+    apply_assets.add_argument("--approved-assets", required=True, help="approved-assets.json from approve-assets")
+    apply_assets.add_argument("--output", required=True, help="Output deck JSON with approved asset_path values applied")
+    apply_assets.add_argument("--report-output", help="Optional approved-asset-application report JSON")
+    apply_assets.set_defaults(func=_cmd_apply_approved_assets)
 
     run_source_local_parser = subparsers.add_parser(
         "run-source-local",
