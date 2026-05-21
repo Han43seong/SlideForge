@@ -86,8 +86,9 @@ def export_pptx_report(
         _write_report(report_path, report)
         return report
 
+    asset_evidence: dict[str, Any] = {"embedded_asset_count": 0, "missing_asset_paths": []}
     try:
-        _export_with_python_pptx(deck, output)
+        asset_evidence = _export_with_python_pptx(deck, output)
     except ImportError as exc:
         report = _base_report(
             deck=deck,
@@ -132,6 +133,7 @@ def export_pptx_report(
     report["output_file_size_bytes"] = output.stat().st_size if exists else 0
     report["slide_count_generated"] = len(deck.slides) if exists else 0
     report["generated_this_run"] = exists
+    report.update(asset_evidence)
     _write_report(report_path, report)
     return report
 
@@ -183,7 +185,7 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _export_with_python_pptx(deck: HtmlDeck, output: Path) -> None:
+def _export_with_python_pptx(deck: HtmlDeck, output: Path) -> dict[str, Any]:
     from pptx import Presentation  # type: ignore[import-not-found]
     from pptx.dml.color import RGBColor  # type: ignore[import-not-found]
     from pptx.enum.text import PP_ALIGN  # type: ignore[import-not-found]
@@ -194,6 +196,8 @@ def _export_with_python_pptx(deck: HtmlDeck, output: Path) -> None:
     prs.slide_height = Inches(7.5)
     blank = prs.slide_layouts[6]
     total = len(deck.slides)
+    embedded_asset_count = 0
+    missing_asset_paths: list[str] = []
 
     for index, source in enumerate(deck.slides, start=1):
         slide = prs.slides.add_slide(blank)
@@ -202,10 +206,14 @@ def _export_with_python_pptx(deck: HtmlDeck, output: Path) -> None:
         if source.subtitle:
             _add_textbox(slide, source.subtitle, Inches(0.74), Inches(1.55), Inches(6.8), Inches(0.45), Pt(16), color="9EB6CC")
         _add_textbox(slide, f"{index:02d} / {total:02d}", Inches(0.74), Inches(0.35), Inches(1.8), Inches(0.28), Pt(10), color="35E7FF", bold=True)
+        embedded, missing = _add_generated_asset_image(slide, source, output.parent, Inches)
+        embedded_asset_count += embedded
+        missing_asset_paths.extend(missing)
         _add_archetype_content(slide, source, Inches, Pt, PP_ALIGN, RGBColor)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(output))
+    return {"embedded_asset_count": embedded_asset_count, "missing_asset_paths": missing_asset_paths}
 
 
 def _add_background(slide: Any, prs: Any, rgb_color: Any) -> None:
@@ -258,6 +266,17 @@ def _add_archetype_content(slide: Any, source: HtmlSlide, inches: Any, pt: Any, 
         _add_bullets(slide, source.bullets, inches(0.9), inches(2.25), inches(7.2), inches(4.1), pt(18))
 
 
+def _add_generated_asset_image(slide: Any, source: HtmlSlide, base_dir: Path, inches: Any) -> tuple[int, list[str]]:
+    if source.archetype not in {"cover", "visual_band", "architecture_visual"} or not source.asset_path:
+        return 0, []
+    asset = Path(source.asset_path)
+    resolved = asset if asset.is_absolute() else base_dir / asset
+    if not resolved.exists():
+        return 0, [source.asset_path]
+    slide.shapes.add_picture(str(resolved), inches(7.15), inches(1.75), width=inches(5.35), height=inches(3.25))
+    return 1, []
+
+
 def _add_bullets(slide: Any, bullets: list[str], left: Any, top: Any, width: Any, height: Any, size: Any) -> None:
     if not bullets:
         return
@@ -277,7 +296,8 @@ def _add_bullets(slide: Any, bullets: list[str], left: Any, top: Any, width: Any
 def _add_visual_chips(slide: Any, source: HtmlSlide, inches: Any, pt: Any) -> None:
     labels = [chip.label for chip in source.visual_chips] or source.bullets
     _add_bullets(slide, labels, inches(0.9), inches(2.25), inches(5.4), inches(3.8), pt(17))
-    _add_textbox(slide, "Visual asset placeholder / deterministic text overlay", inches(7.4), inches(4.7), inches(4.8), inches(0.5), pt(13), color="9EB6CC")
+    if not source.asset_path:
+        _add_textbox(slide, "Visual asset placeholder / deterministic text overlay", inches(7.4), inches(4.7), inches(4.8), inches(0.5), pt(13), color="9EB6CC")
 
 
 def _add_timeline(slide: Any, source: HtmlSlide, inches: Any, pt: Any) -> None:

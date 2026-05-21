@@ -1,5 +1,7 @@
+import base64
 import json
 import tomllib
+import zipfile
 
 from slideforge.guizang_html_composer import HtmlDeck, HtmlSlide
 from slideforge.pptx_export import PptxRendererEvidence, export_pptx_report
@@ -128,3 +130,75 @@ def test_pptx_glimpse_unavailable_renderer_semantics(monkeypatch):
         "Renderer evidence requires approved pptx-glimpse installation; no install was performed."
     ]
     assert evidence["evidence_claim"] == "availability_only_no_visual_render_performed"
+
+
+def test_export_pptx_embeds_generated_asset_images(tmp_path, monkeypatch):
+    monkeypatch.setattr("slideforge.pptx_export.PptxRendererEvidence.detect", lambda: PptxRendererEvidence(
+        strategy="pptx_glimpse_available_for_renderer_evidence",
+        status="available",
+        tool={"name": "pptx_glimpse", "executable": "pptx-glimpse", "available": True, "path": "pptx-glimpse"},
+        blockers=[],
+    ))
+    asset_dir = tmp_path / "generated-assets"
+    asset_dir.mkdir()
+    asset = asset_dir / "visual.png"
+    asset.write_bytes(base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    ))
+    deck = HtmlDeck(
+        title="asset deck",
+        slides=[
+            HtmlSlide(
+                slide_id="s1",
+                title="생성 이미지",
+                archetype="visual_band",
+                asset_path="generated-assets/visual.png",
+                visual_chips=[],
+            )
+        ],
+    )
+    output = tmp_path / "deck.pptx"
+
+    report = export_pptx_report(deck, output, tmp_path / "report.json", run_id="asset-smoke")
+
+    assert report["status"] == "available"
+    assert report["embedded_asset_count"] == 1
+    assert report["missing_asset_paths"] == []
+    with zipfile.ZipFile(output) as pptx:
+        media_files = [name for name in pptx.namelist() if name.startswith("ppt/media/")]
+        slide_rels = pptx.read("ppt/slides/_rels/slide1.xml.rels").decode("utf-8")
+    assert media_files
+    assert "../media/" in slide_rels
+
+
+def test_export_pptx_omits_visual_placeholder_label_when_asset_is_embedded(tmp_path, monkeypatch):
+    monkeypatch.setattr("slideforge.pptx_export.PptxRendererEvidence.detect", lambda: PptxRendererEvidence(
+        strategy="pptx_glimpse_available_for_renderer_evidence",
+        status="available",
+        tool={"name": "pptx_glimpse", "executable": "pptx-glimpse", "available": True, "path": "pptx-glimpse"},
+        blockers=[],
+    ))
+    (tmp_path / "generated-assets").mkdir()
+    (tmp_path / "generated-assets" / "visual.png").write_bytes(base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    ))
+    deck = HtmlDeck(
+        title="asset deck",
+        slides=[
+            HtmlSlide(
+                slide_id="s1",
+                title="생성 이미지",
+                archetype="visual_band",
+                asset_path="generated-assets/visual.png",
+                visual_chips=[],
+            )
+        ],
+    )
+    output = tmp_path / "deck.pptx"
+
+    export_pptx_report(deck, output, tmp_path / "report.json", run_id="asset-smoke")
+
+    with zipfile.ZipFile(output) as pptx:
+        slide_xml = pptx.read("ppt/slides/slide1.xml").decode("utf-8")
+    assert "Visual asset placeholder" not in slide_xml
+    assert "deterministic text overlay" not in slide_xml
