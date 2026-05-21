@@ -102,11 +102,36 @@ ComfyUI can remain the primary visual review UI when the operator is at the loca
 
 ```text
 ComfyUI UI / review board / Telegram selection
+  -> generate-asset-candidates
+  -> asset-generation-report.json
+  -> build-asset-review-board
+  -> asset-review-board.html / asset-review-board.md
   -> approve-assets
   -> approved-assets.json
   -> apply-approved-assets
   -> deck.approved.json
   -> run-local / HTML / PPTX / evidence
+```
+
+Create an asset candidate report from already-generated ComfyUI/diagram files:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli generate-asset-candidates \
+  --run-id <run-id> \
+  --candidate "slide-01=A:runs/<run-id>/generated-assets/slide-01-a.png:comfyui_ui" \
+  --candidate "slide-01=B:runs/<run-id>/generated-assets/slide-01-b.png:comfyui_ui" \
+  --output runs/<run-id>/asset-generation-report.json
+```
+
+Build the visual review board:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli build-asset-review-board \
+  --candidates runs/<run-id>/asset-generation-report.json \
+  --deck runs/<run-id>/deck.json \
+  --output-html runs/<run-id>/asset-review-board.html \
+  --output-md runs/<run-id>/asset-review-board.md \
+  --recommended "slide-01=B"
 ```
 
 Record a ComfyUI UI selection from an asset candidate report:
@@ -129,6 +154,8 @@ PYTHONPATH=src python -m slideforge.cli apply-approved-assets \
   --output runs/<run-id>/deck.approved.json \
   --report-output runs/<run-id>/approved-asset-application-report.json
 ```
+
+`generate-asset-candidates` validates existing candidate files and writes an `asset-generation-report.json` that can represent ComfyUI UI history selections, deterministic diagram outputs, or candidates delivered through another channel. `build-asset-review-board` turns that report into a user-facing HTML/Markdown board with actual candidate images, slide titles, source/notes, a recommended badge, and an approval command hint.
 
 `approve-assets` validates selected candidate ids and asset files, then records `approved_by`, `approval_mode` (`explicit_user`, `jarvis_recommended`, or `autonomous`), candidate source, and selected asset paths. `apply-approved-assets` writes a new deck JSON with `asset_path` applied only to matching approved slide ids and records unmatched approvals in the application report.
 

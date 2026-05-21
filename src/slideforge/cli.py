@@ -7,7 +7,12 @@ from typing import Any
 
 from slideforge.archetype_mapper import ArchetypeMapping
 from slideforge.asset_brief_generator import generate_asset_briefs
-from slideforge.asset_approval import apply_approved_assets, write_approved_assets
+from slideforge.asset_approval import (
+    apply_approved_assets,
+    write_approved_assets,
+    write_asset_candidates_report,
+    write_asset_review_board,
+)
 from slideforge.browser_capture import capture_html_deck_screenshots
 from slideforge.comfyui_handoff import (
     DEFAULT_COMFYUI_ENDPOINT,
@@ -226,6 +231,28 @@ def _cmd_approve_assets(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_generate_asset_candidates(args: argparse.Namespace) -> int:
+    payload = write_asset_candidates_report(
+        run_id=args.run_id,
+        candidate_specs=args.candidate,
+        output=Path(args.output),
+    )
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
+def _cmd_build_asset_review_board(args: argparse.Namespace) -> int:
+    report = write_asset_review_board(
+        candidates_path=Path(args.candidates),
+        deck_path=Path(args.deck) if args.deck else None,
+        output_html=Path(args.output_html),
+        output_md=Path(args.output_md) if args.output_md else None,
+        recommended=args.recommended or "",
+    )
+    print(json.dumps(report, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
 def _cmd_apply_approved_assets(args: argparse.Namespace) -> int:
     report = apply_approved_assets(
         deck_path=Path(args.deck),
@@ -437,6 +464,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     approve_assets.add_argument("--notes", default="")
     approve_assets.set_defaults(func=_cmd_approve_assets)
+
+    generate_candidates = subparsers.add_parser(
+        "generate-asset-candidates",
+        help="Create an asset-generation-report from already generated candidate image files",
+    )
+    generate_candidates.add_argument("--run-id", required=True)
+    generate_candidates.add_argument(
+        "--candidate",
+        action="append",
+        required=True,
+        help="Candidate spec slide_id=candidate_id:path[:source[:notes]], repeat for multiple candidates",
+    )
+    generate_candidates.add_argument("--output", required=True, help="asset-generation-report.json output path")
+    generate_candidates.set_defaults(func=_cmd_generate_asset_candidates)
+
+    review_board = subparsers.add_parser(
+        "build-asset-review-board",
+        help="Build an HTML/Markdown visual candidate board from an asset-generation-report",
+    )
+    review_board.add_argument("--candidates", required=True, help="Asset candidate generation report JSON")
+    review_board.add_argument("--deck", help="Optional HtmlDeck-compatible deck JSON for slide titles")
+    review_board.add_argument("--output-html", required=True, help="HTML review board output path")
+    review_board.add_argument("--output-md", help="Optional Markdown review board output path")
+    review_board.add_argument(
+        "--recommended",
+        default="",
+        help="Optional comma-separated recommended selections, e.g. slide-01=B,slide-03=A",
+    )
+    review_board.set_defaults(func=_cmd_build_asset_review_board)
 
     apply_assets = subparsers.add_parser(
         "apply-approved-assets",

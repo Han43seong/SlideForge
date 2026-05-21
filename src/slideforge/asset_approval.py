@@ -1,10 +1,151 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
+from html import escape
 from pathlib import Path
 from typing import Any
 
 VALID_APPROVAL_MODES = {"explicit_user", "jarvis_recommended", "autonomous"}
+
+
+def _parse_candidate_spec(spec: str) -> dict[str, Any]:
+    """Parse slide_id=candidate_id:path[:source[:notes]] candidate specs."""
+    if "=" not in spec:
+        raise ValueError(f"candidate must use slide_id=candidate_id:path[:source[:notes]]: {spec}")
+    slide_id, rest = spec.split("=", 1)
+    parts = rest.split(":", 3)
+    if len(parts) < 2:
+        raise ValueError(f"candidate must include candidate_id and asset path: {spec}")
+    candidate_id, asset_path = parts[0].strip(), parts[1].strip()
+    source = parts[2].strip() if len(parts) >= 3 and parts[2].strip() else "manual_file"
+    notes = parts[3].strip() if len(parts) >= 4 else ""
+    slide_id = slide_id.strip()
+    if not slide_id or not candidate_id or not asset_path:
+        raise ValueError(f"candidate must include non-empty slide_id, candidate_id, and asset path: {spec}")
+    if not Path(asset_path).exists():
+        raise FileNotFoundError(f"candidate asset does not exist: {asset_path}")
+    return {
+        "slide_id": slide_id,
+        "candidate_id": candidate_id,
+        "asset_path": asset_path,
+        "source": source,
+        "status": "generated",
+        "notes": notes,
+    }
+
+
+def write_asset_candidates_report(
+    *,
+    run_id: str,
+    candidate_specs: list[str],
+    output: Path,
+) -> dict[str, Any]:
+    if not candidate_specs:
+        raise ValueError("at least one --candidate is required")
+    candidates = [_parse_candidate_spec(spec) for spec in candidate_specs]
+    payload = {
+        "report_kind": "asset_generation_report",
+        "run_id": run_id,
+        "candidate_count": len(candidates),
+        "candidates": candidates,
+    }
+    _write_json(output, payload)
+    return payload
+
+
+def write_asset_review_board(
+    *,
+    candidates_path: Path,
+    deck_path: Path | None,
+    output_html: Path,
+    output_md: Path | None = None,
+    recommended: str = "",
+) -> dict[str, Any]:
+    report = _load_json(candidates_path)
+    candidates = report.get("candidates", [])
+    if not isinstance(candidates, list):
+        raise ValueError("candidate report must contain a candidates list")
+    deck = _load_json(deck_path) if deck_path else {}
+    slide_titles = {
+        str(slide.get("slide_id", "")): str(slide.get("title", ""))
+        for slide in deck.get("slides", [])
+        if isinstance(slide, dict)
+    }
+    recommended_by_slide = _parse_selection(recommended) if recommended else {}
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            grouped[str(candidate.get("slide_id", ""))].append(candidate)
+
+    html_parts = [
+        "<!doctype html>",
+        "<html lang=\"en\"><head><meta charset=\"utf-8\"><title>Asset Review Board</title>",
+        "<style>body{font-family:Inter,Arial,sans-serif;background:#0b1020;color:#eaf2ff;margin:32px}"
+        ".slide{border:1px solid #26324f;border-radius:18px;padding:20px;margin:0 0 24px;background:#111832}"
+        ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}"
+        ".card{border:1px solid #33415f;border-radius:14px;padding:12px;background:#151f3d}"
+        ".card.recommended{border-color:#38d6ff;box-shadow:0 0 0 1px #38d6ff55}"
+        "img{width:100%;height:auto;border-radius:10px;background:#050914}.meta{color:#9fb0d9;font-size:13px}"
+        "code{background:#050914;padding:2px 6px;border-radius:6px}</style></head><body>",
+        "<h1>Asset Review Board</h1>",
+        f"<p class=\"meta\">Run: {escape(str(report.get('run_id', '')))} · Candidates: {len(candidates)}</p>",
+    ]
+    md_parts = ["# Asset Review Board", "", f"Run: {report.get('run_id', '')}", ""]
+
+    for slide_id in sorted(grouped):
+        title = slide_titles.get(slide_id, "")
+        heading = f"Slide {slide_id}" + (f" · {title}" if title else "")
+        html_parts.append(f"<section class=\"slide\"><h2>{escape(heading)}</h2><div class=\"grid\">")
+        md_parts.extend([f"## {heading}", ""])
+        for candidate in grouped[slide_id]:
+            candidate_id = str(candidate.get("candidate_id", ""))
+            asset_path = str(candidate.get("asset_path", ""))
+            source = str(candidate.get("source", ""))
+            notes = str(candidate.get("notes", ""))
+            is_recommended = recommended_by_slide.get(slide_id) == candidate_id
+            badge = " <strong>Recommended</strong>" if is_recommended else ""
+            card_class = "card recommended" if is_recommended else "card"
+            html_parts.append(
+                f"<article class=\"{card_class}\"><h3>Candidate {escape(candidate_id)}{badge}</h3>"
+                f"<img src=\"{escape(asset_path)}\" alt=\"Slide {escape(slide_id)} candidate {escape(candidate_id)}\">"
+                f"<p class=\"meta\">Source: {escape(source)}</p>"
+                f"<p>{escape(notes)}</p></article>"
+            )
+            md_parts.extend(
+                [
+                    f"- Candidate {candidate_id}" + (" — Recommended" if is_recommended else ""),
+                    f"  - file: {asset_path}",
+                    f"  - source: {source}",
+                    f"  - notes: {notes}",
+                ]
+            )
+        selection_hint = recommended or ",".join(
+            f"{slide_id}={items[0].get('candidate_id', '')}" for slide_id, items in grouped.items() if items
+        )
+        selection_hint_html = escape(selection_hint, quote=False)
+        html_parts.append(
+            "</div>"
+            f"<p>Approval command: <code>approve-assets --selection \"{selection_hint_html}\"</code></p>"
+            "</section>"
+        )
+        md_parts.extend(["", f"Approval command: `approve-assets --selection \"{selection_hint}\"`", ""])
+
+    html_parts.append("</body></html>")
+    output_html.parent.mkdir(parents=True, exist_ok=True)
+    output_html.write_text("\n".join(html_parts) + "\n", encoding="utf-8")
+    if output_md:
+        output_md.parent.mkdir(parents=True, exist_ok=True)
+        output_md.write_text("\n".join(md_parts) + "\n", encoding="utf-8")
+    return {
+        "report_kind": "asset_review_board",
+        "run_id": report.get("run_id", ""),
+        "candidate_count": len(candidates),
+        "slide_count": len(grouped),
+        "output_html": str(output_html),
+        "output_md": str(output_md) if output_md else "",
+        "recommended": recommended_by_slide,
+    }
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:

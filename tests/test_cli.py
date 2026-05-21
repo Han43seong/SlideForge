@@ -245,6 +245,131 @@ def test_cli_export_evidence_pack_writes_zip(tmp_path):
     assert data["summary_status"] == "needs_visual_evidence"
     assert data["artifacts"][0]["sha256"]
 
+def test_cli_generate_asset_candidates_writes_file_based_candidate_report(tmp_path):
+    candidate_a = tmp_path / "generated-assets" / "candidates" / "slide-01-a.png"
+    candidate_b = tmp_path / "generated-assets" / "candidates" / "slide-01-b.png"
+    candidate_a.parent.mkdir(parents=True)
+    candidate_a.write_bytes(b"fake-png-a")
+    candidate_b.write_bytes(b"fake-png-b")
+    output_path = tmp_path / "asset-generation-report.json"
+
+    exit_code = main(
+        [
+            "generate-asset-candidates",
+            "--run-id",
+            "asset-gate-smoke",
+            "--candidate",
+            f"slide-01=A:{candidate_a}:comfyui_ui",
+            "--candidate",
+            f"slide-01=B:{candidate_b}:comfyui_ui",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert data["report_kind"] == "asset_generation_report"
+    assert data["run_id"] == "asset-gate-smoke"
+    assert data["candidate_count"] == 2
+    assert data["candidates"] == [
+        {
+            "slide_id": "slide-01",
+            "candidate_id": "A",
+            "asset_path": str(candidate_a),
+            "source": "comfyui_ui",
+            "status": "generated",
+            "notes": "",
+        },
+        {
+            "slide_id": "slide-01",
+            "candidate_id": "B",
+            "asset_path": str(candidate_b),
+            "source": "comfyui_ui",
+            "status": "generated",
+            "notes": "",
+        },
+    ]
+
+
+def test_cli_build_asset_review_board_writes_html_and_markdown(tmp_path):
+    candidate_a = tmp_path / "generated-assets" / "candidates" / "slide-01-a.png"
+    candidate_b = tmp_path / "generated-assets" / "candidates" / "slide-01-b.png"
+    candidate_a.parent.mkdir(parents=True)
+    candidate_a.write_bytes(b"fake-png-a")
+    candidate_b.write_bytes(b"fake-png-b")
+    candidates_path = tmp_path / "asset-generation-report.json"
+    candidates_path.write_text(
+        json.dumps(
+            {
+                "report_kind": "asset_generation_report",
+                "run_id": "asset-gate-smoke",
+                "candidates": [
+                    {
+                        "slide_id": "slide-01",
+                        "candidate_id": "A",
+                        "asset_path": str(candidate_a),
+                        "source": "comfyui_ui",
+                        "status": "generated",
+                        "notes": "strong visual but cramped title area",
+                    },
+                    {
+                        "slide_id": "slide-01",
+                        "candidate_id": "B",
+                        "asset_path": str(candidate_b),
+                        "source": "comfyui_ui",
+                        "status": "generated",
+                        "notes": "recommended: best left text area",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    deck_path = tmp_path / "deck.json"
+    deck_path.write_text(
+        json.dumps(
+            {
+                "title": "Asset approval deck",
+                "slides": [{"slide_id": "slide-01", "title": "Cover", "archetype": "cover"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    html_path = tmp_path / "asset-review-board.html"
+    md_path = tmp_path / "asset-review-board.md"
+
+    exit_code = main(
+        [
+            "build-asset-review-board",
+            "--candidates",
+            str(candidates_path),
+            "--deck",
+            str(deck_path),
+            "--output-html",
+            str(html_path),
+            "--output-md",
+            str(md_path),
+            "--recommended",
+            "slide-01=B",
+        ]
+    )
+
+    assert exit_code == 0
+    html = html_path.read_text(encoding="utf-8")
+    assert "Asset Review Board" in html
+    assert "Slide slide-01 · Cover" in html
+    assert str(candidate_a) in html
+    assert str(candidate_b) in html
+    assert "Recommended" in html
+    assert "approve-assets --selection \"slide-01=B\"" in html
+    markdown = md_path.read_text(encoding="utf-8")
+    assert "# Asset Review Board" in markdown
+    assert "## Slide slide-01 · Cover" in markdown
+    assert "Candidate B" in markdown
+    assert "recommended: best left text area" in markdown
+
+
 def test_cli_approve_assets_records_comfyui_ui_selection(tmp_path):
     candidate = tmp_path / "generated-assets" / "candidates" / "slide-01-b.png"
     candidate.parent.mkdir(parents=True)
