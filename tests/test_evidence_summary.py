@@ -129,3 +129,57 @@ def test_cli_writes_json_and_markdown_summary(tmp_path):
     assert "## Browser capture" in text
     assert "## PPTX" in text
     assert "## ComfyUI" in text
+
+
+def test_summary_uses_supplemental_pptx_visual_render_qa(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "deck.json").write_text(json.dumps({"slides": [{"slide_id": "s1"}]}), encoding="utf-8")
+    (run_dir / "deck.html").write_text("<html></html>", encoding="utf-8")
+    (run_dir / "browser-capture").mkdir()
+    _write_json(
+        run_dir / "browser-capture" / "browser-regression-report.json",
+        {
+            "screenshot_capture": {"status": "captured"},
+            "screenshots": ["slide-01.png"],
+            "slide_count_detected": 1,
+        },
+    )
+    _write_json(
+        run_dir / "pptx-export-report.json",
+        {
+            "status": "available",
+            "generation_claim": "pptx_generated_with_python_pptx_static_evidence_only",
+            "generated_this_run": True,
+            "output_exists": True,
+            "slide_count_generated": 1,
+            "renderer_evidence": {"status": "unavailable"},
+            "blockers": ["Renderer evidence requires approved pptx-glimpse installation; no install was performed."],
+        },
+    )
+    _write_json(
+        run_dir / "pptx-visual-render-qa.json",
+        {
+            "report_kind": "pptx_visual_render_qa",
+            "render_artifacts": {"png_count": 1, "svg_count": 1},
+            "visual_qa": {
+                "verdict": "PASS_WITH_MINOR_WARNINGS",
+                "korean_glyphs_readable": True,
+                "missing_glyph_or_tofu_boxes": False,
+                "blocking_clipping_or_overlap": False,
+            },
+            "blockers": [],
+            "warnings": ["minor polish warning"],
+        },
+    )
+
+    summary = summarize_run(run_dir)
+
+    pptx = summary["sections"]["pptx"]
+    assert pptx["renderer_status"] == "rendered"
+    assert pptx["visual_qa_verdict"] == "PASS_WITH_MINOR_WARNINGS"
+    assert "pptx-render-qa" in summary["artifacts"]
+    assert "pptx_renderer_evidence_missing: no real PPTX render evidence recorded" not in summary["warnings"]
+    assert all("Renderer evidence requires approved pptx-glimpse" not in warning for warning in summary["warnings"])
+    assert "pptx_render_qa_warning: minor polish warning" in summary["warnings"]
+

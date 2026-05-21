@@ -76,6 +76,8 @@ def _render_asset_placeholder(placeholder: AssetPlaceholder) -> str:
 def _render_asset_placeholders(slide: HtmlSlide, chip_items: list[VisualChip]) -> str:
     if not _is_asset_placeholder_archetype(slide.archetype):
         return ""
+    if slide.asset_path:
+        return ""
     placeholders = slide.asset_placeholders or [_default_asset_placeholder(slide, chip_items)]
     cards = "".join(_render_asset_placeholder(placeholder) for placeholder in placeholders)
     return f'''

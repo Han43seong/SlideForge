@@ -145,6 +145,29 @@ def test_compose_html_deck_renders_comfyui_asset_placeholders_for_visual_archety
     assert 'data-asset-slot="text-1' not in html
 
 
+def test_visual_archetype_uses_generated_asset_path_without_placeholder_card():
+    deck = HtmlDeck(
+        title="generated asset deck",
+        slides=[
+            HtmlSlide(
+                slide_id="generated-visual",
+                title="생성 에셋",
+                archetype="visual_band",
+                asset_path="generated-assets/visual.png",
+                visual_chips=[VisualChip(label="AI maintenance")],
+            )
+        ],
+    )
+
+    html = compose_html_deck(deck)
+
+    assert "background-image:url('generated-assets/visual.png')" in html
+    assert "ComfyUI asset placeholder" not in html
+    assert 'class="asset-placeholder-card"' not in html
+    assert 'data-asset-status="placeholder-only"' not in html
+    assert "AI maintenance" in html
+
+
 def test_asset_placeholder_rejects_real_integration_paths_and_escapes_metadata():
     try:
         AssetPlaceholder(slot_id="bad", asset_type="cover_background", prompt="ok", generated_path="generated.png")
