@@ -27,6 +27,8 @@ from slideforge.evidence_summary import write_evidence_summary
 from slideforge.fidelity_report import render_fidelity_report
 from slideforge.fidelity_scorer import FidelityScoreInput, score_fidelity
 from slideforge.guizang_html_composer import compose_html_deck
+from slideforge.manual_assets import import_manual_openai_assets
+from slideforge.manual_prompts import write_openai_manual_prompt_pack
 from slideforge.schemas import (
     AssetPlaceholder,
     ChartDatum,
@@ -236,6 +238,26 @@ def _cmd_generate_asset_candidates(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         candidate_specs=args.candidate,
         output=Path(args.output),
+    )
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
+def _cmd_generate_openai_manual_prompts(args: argparse.Namespace) -> int:
+    payload = write_openai_manual_prompt_pack(
+        asset_spec_dir=Path(args.asset_spec_dir),
+        output_dir=Path(args.output_dir),
+    )
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    return 0
+
+
+def _cmd_import_manual_assets(args: argparse.Namespace) -> int:
+    payload = import_manual_openai_assets(
+        run_dir=Path(args.run_dir),
+        asset_spec_dir=Path(args.asset_spec_dir),
+        input_dir=Path(args.input_dir),
+        output_report=Path(args.output_report),
     )
     print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     return 0
@@ -478,6 +500,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     generate_candidates.add_argument("--output", required=True, help="asset-generation-report.json output path")
     generate_candidates.set_defaults(func=_cmd_generate_asset_candidates)
+
+    openai_prompts = subparsers.add_parser(
+        "generate-openai-manual-prompts",
+        help="Generate prompt-pack artifacts for manual ChatGPT Pro / OpenAI Images asset generation",
+    )
+    openai_prompts.add_argument("--asset-spec-dir", required=True, help="Directory containing JSON asset specs")
+    openai_prompts.add_argument("--output-dir", required=True, help="Directory for prompt-pack.md/json and per-asset prompts")
+    openai_prompts.set_defaults(func=_cmd_generate_openai_manual_prompts)
+
+    import_manual = subparsers.add_parser(
+        "import-manual-assets",
+        help="Import manually downloaded ChatGPT Pro / OpenAI Images candidates into a run asset report",
+    )
+    import_manual.add_argument("--run-dir", required=True, help="SlideForge run directory")
+    import_manual.add_argument("--asset-spec-dir", required=True, help="Directory containing JSON asset specs")
+    import_manual.add_argument(
+        "--input-dir",
+        required=True,
+        help="Directory containing <asset_id>/A.png, B.png, C.png manual candidates",
+    )
+    import_manual.add_argument("--output-report", required=True, help="asset-generation-report.json output path")
+    import_manual.set_defaults(func=_cmd_import_manual_assets)
 
     review_board = subparsers.add_parser(
         "build-asset-review-board",

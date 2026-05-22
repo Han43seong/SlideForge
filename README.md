@@ -155,6 +155,41 @@ PYTHONPATH=src python -m slideforge.cli apply-approved-assets \
   --report-output runs/<run-id>/approved-asset-application-report.json
 ```
 
+
+### Manual OpenAI Images prompt/import workflow (v2)
+
+The Visual Asset Approval Pipeline also supports manual ChatGPT Pro / OpenAI Images generation without automating the web UI, calling the OpenAI API, or renaming the pipeline. SlideForge only prepares prompts, imports files the operator downloaded manually, and keeps the existing review/approval artifacts.
+
+Create JSON asset specs under `runs/<run-id>/asset-specs/`, then generate the manual prompt pack:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli generate-openai-manual-prompts \
+  --asset-spec-dir runs/<run-id>/asset-specs \
+  --output-dir runs/<run-id>/openai-manual-prompts
+```
+
+This writes `prompt-pack.md`, `prompt-pack.json`, and one `<asset_id>.md` prompt per spec. Each prompt includes the asset role, target slide, style/palette, text/logo/watermark constraints, output guidance, and save-path instructions.
+
+After manually generating images in ChatGPT Pro / OpenAI Images, save candidates as:
+
+```text
+runs/<run-id>/manual-generated-assets/<asset_id>/A.png
+runs/<run-id>/manual-generated-assets/<asset_id>/B.png
+runs/<run-id>/manual-generated-assets/<asset_id>/C.png
+```
+
+Import them into the existing candidate report shape:
+
+```bash
+PYTHONPATH=src python -m slideforge.cli import-manual-assets \
+  --run-dir runs/<run-id> \
+  --asset-spec-dir runs/<run-id>/asset-specs \
+  --input-dir runs/<run-id>/manual-generated-assets \
+  --output-report runs/<run-id>/asset-generation-report.json
+```
+
+The import step copies supported images into `runs/<run-id>/imported-assets/<asset_id>-<candidate_id>.<ext>`, records candidates with `provider=openai_images`, `source=manual_openai_images`, `generation_mode=manual_chatgpt_pro`, prompt-file and license-note metadata, warns for missing asset folders, and ignores unsupported extensions. The existing `build-asset-review-board`, `approve-assets`, and `apply-approved-assets` commands remain the approval/apply flow.
+
 `generate-asset-candidates` validates existing candidate files and writes an `asset-generation-report.json` that can represent ComfyUI UI history selections, deterministic diagram outputs, or candidates delivered through another channel. `build-asset-review-board` turns that report into a user-facing HTML/Markdown board with actual candidate images, slide titles, source/notes, a recommended badge, and an approval command hint.
 
 `approve-assets` validates selected candidate ids and asset files, then records `approved_by`, `approval_mode` (`explicit_user`, `jarvis_recommended`, or `autonomous`), candidate source, and selected asset paths. `apply-approved-assets` writes a new deck JSON with `asset_path` applied only to matching approved slide ids and records unmatched approvals in the application report.

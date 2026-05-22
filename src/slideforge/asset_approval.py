@@ -76,7 +76,8 @@ def write_asset_review_board(
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for candidate in candidates:
         if isinstance(candidate, dict):
-            grouped[str(candidate.get("slide_id", ""))].append(candidate)
+            slide_id = str(candidate.get("slide_id") or candidate.get("target_slide") or candidate.get("asset_id") or "")
+            grouped[slide_id].append(candidate)
 
     html_parts = [
         "<!doctype html>",
@@ -93,6 +94,28 @@ def write_asset_review_board(
     ]
     md_parts = ["# Asset Review Board", "", f"Run: {report.get('run_id', '')}", ""]
 
+    if not grouped:
+        guidance = _empty_candidate_guidance(report)
+        html_parts.extend(
+            [
+                "<section class=\"slide\"><h2>No candidate assets found</h2>",
+                f"<p>{escape(guidance['message'])}</p>",
+                "<ul>",
+                *[f"<li>{escape(item)}</li>" for item in guidance["actions"]],
+                "</ul></section>",
+            ]
+        )
+        md_parts.extend(
+            [
+                "## No candidate assets found",
+                "",
+                guidance["message"],
+                "",
+                *[f"- {item}" for item in guidance["actions"]],
+                "",
+            ]
+        )
+
     for slide_id in sorted(grouped):
         title = slide_titles.get(slide_id, "")
         heading = f"Slide {slide_id}" + (f" · {title}" if title else "")
@@ -100,26 +123,29 @@ def write_asset_review_board(
         md_parts.extend([f"## {heading}", ""])
         for candidate in grouped[slide_id]:
             candidate_id = str(candidate.get("candidate_id", ""))
-            asset_path = str(candidate.get("asset_path", ""))
+            asset_path = str(candidate.get("asset_path") or candidate.get("path") or "")
             source = str(candidate.get("source", ""))
             notes = str(candidate.get("notes", ""))
+            metadata = _candidate_metadata_lines(candidate)
             is_recommended = recommended_by_slide.get(slide_id) == candidate_id
             badge = " <strong>Recommended</strong>" if is_recommended else ""
             card_class = "card recommended" if is_recommended else "card"
+            metadata_html = "".join(
+                f"<p class=\"meta\">{escape(label)}: {escape(value)}</p>" for label, value in metadata
+            )
             html_parts.append(
                 f"<article class=\"{card_class}\"><h3>Candidate {escape(candidate_id)}{badge}</h3>"
                 f"<img src=\"{escape(asset_path)}\" alt=\"Slide {escape(slide_id)} candidate {escape(candidate_id)}\">"
                 f"<p class=\"meta\">Source: {escape(source)}</p>"
-                f"<p>{escape(notes)}</p></article>"
+                f"{metadata_html}<p>{escape(notes)}</p></article>"
             )
-            md_parts.extend(
-                [
-                    f"- Candidate {candidate_id}" + (" — Recommended" if is_recommended else ""),
-                    f"  - file: {asset_path}",
-                    f"  - source: {source}",
-                    f"  - notes: {notes}",
-                ]
-            )
+            md_parts.extend([
+                f"- Candidate {candidate_id}" + (" — Recommended" if is_recommended else ""),
+                f"  - file: {asset_path}",
+                f"  - source: {source}",
+                *[f"  - {label}: {value}" for label, value in metadata],
+                f"  - notes: {notes}",
+            ])
         selection_hint = recommended or ",".join(
             f"{slide_id}={items[0].get('candidate_id', '')}" for slide_id, items in grouped.items() if items
         )
@@ -155,6 +181,50 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _empty_candidate_guidance(report: dict[str, Any]) -> dict[str, list[str] | str]:
+    source = str(report.get("source", ""))
+    input_dir = str(report.get("input_dir") or "manual-generated-assets")
+    asset_spec_dir = str(report.get("asset_spec_dir") or "asset-specs")
+    if source == "manual_openai_images":
+        return {
+            "message": "No manual OpenAI Images candidates were imported yet.",
+            "actions": [
+                f"Generate or review prompts under openai-manual-prompts/ from specs in {asset_spec_dir}.",
+                f"Save downloaded ChatGPT Pro / OpenAI Images files as {input_dir}/<asset_id>/A.png, B.png, C.png.",
+                "Rerun import-manual-assets, then rebuild this asset review board.",
+            ],
+        }
+    return {
+        "message": "No candidate assets are available in this asset-generation report.",
+        "actions": [
+            "Generate or import candidate assets, then rebuild this asset review board.",
+        ],
+    }
+
+
+def _candidate_metadata_lines(candidate: dict[str, Any]) -> list[tuple[str, str]]:
+    labels = {
+        "asset_id": "Asset ID",
+        "provider": "Provider",
+        "generation_mode": "Generation mode",
+        "prompt_file": "Prompt file",
+        "license_note": "License note",
+    }
+    lines: list[tuple[str, str]] = []
+    for key, label in labels.items():
+        value = str(candidate.get(key, "")).strip()
+        if value:
+            lines.append((label, value))
+    return lines
+
+
+def _resolve_report_relative(path_text: str, report_path: Path) -> Path:
+    path = Path(path_text)
+    if path.is_absolute() or path.exists():
+        return path
+    return report_path.parent / path
 
 
 def _parse_selection(selection: str) -> dict[str, str]:
@@ -197,7 +267,7 @@ def write_approved_assets(
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
-        slide_id = str(candidate.get("slide_id", ""))
+        slide_id = str(candidate.get("slide_id") or candidate.get("target_slide") or candidate.get("asset_id") or "")
         candidate_id = str(candidate.get("candidate_id", ""))
         if slide_id and candidate_id:
             by_key[(slide_id, candidate_id)] = candidate
@@ -209,10 +279,11 @@ def write_approved_assets(
             raise ValueError(f"selection {slide_id}={candidate_id} does not match any candidate")
         if candidate.get("status", "generated") not in {"generated", "available", "approved_candidate"}:
             raise ValueError(f"candidate {slide_id}={candidate_id} is not available for approval")
-        asset_path = str(candidate.get("asset_path", ""))
+        asset_path = str(candidate.get("asset_path") or candidate.get("path") or "")
         if not asset_path:
             raise ValueError(f"candidate {slide_id}={candidate_id} is missing asset_path")
-        if not Path(asset_path).exists():
+        resolved_asset_path = _resolve_report_relative(asset_path, candidates_path)
+        if not resolved_asset_path.exists():
             raise FileNotFoundError(f"approved candidate asset does not exist: {asset_path}")
         approved_assets.append(
             {
@@ -262,7 +333,7 @@ def apply_approved_assets(
         asset_path = str(asset.get("asset_path", ""))
         if not slide_id or not asset_path:
             raise ValueError("each approved asset must include slide_id and asset_path")
-        if not Path(asset_path).exists():
+        if not _resolve_report_relative(asset_path, approved_assets_path).exists():
             raise FileNotFoundError(f"approved asset does not exist: {asset_path}")
         by_slide[slide_id] = asset
 
