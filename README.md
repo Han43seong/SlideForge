@@ -4,6 +4,20 @@ SlideForge is a clean restart of the slide-generation pipeline learned from `her
 
 The project focuses on high-fidelity slide production from design references that may be PPTX templates, slide-preview links, screenshots, images, PDFs, or web pages.
 
+## Project overview
+
+SlideForge is an evidence-first production toolkit for turning source material and visual references into presentation decks. It is not a single image generator and it is not a black-box slide bot. The project separates planning, visual asset generation, deterministic layout composition, approval, QA, and delivery so each stage can be inspected and repeated.
+
+Core ideas:
+
+- **Reference-aware production:** extract design grammar from template observations and map user content into slide archetypes instead of generating arbitrary slides.
+- **Deterministic text/layout ownership:** Korean/English text, tables, charts, metrics, diagrams, and PPTX structure are produced by SlideForge/composer code, not baked into generated images.
+- **Asset approval before assembly:** visual candidates become durable records in `asset-generation-report.json`, are reviewed in `asset-review-board.html`/`.md`, then selected in `approved-assets.json` before being applied to a deck.
+- **Evidence-first delivery:** every run should leave machine-readable reports for manifests, browser plans/captures, PPTX gates/exports, asset approvals, summaries, and fidelity checks.
+- **Provider-routed visuals:** OpenAI Images through manual ChatGPT Pro generation is the default v2 workflow; ComfyUI and other providers remain optional candidate sources rather than the slide-production core.
+
+Typical output artifacts include `deck.json`, `deck.html`, optional `.pptx`, screenshots, review boards, approval reports, fidelity reports, run summaries, and portable evidence packs.
+
 ## Fixed production architecture
 
 ```text
@@ -11,7 +25,9 @@ Design analysis / planning:
   JARVIS + hermes-slide-director learnings
 
 High-quality graphical assets:
-  ComfyUI
+  Visual Asset Approval Pipeline v2
+  - default: OpenAI Images via manual ChatGPT Pro generation and SlideForge import
+  - fallback/special cases: ComfyUI local/private/high-control assets
 
 Primary slide production:
   codex-guizang-html
@@ -30,17 +46,24 @@ PPTX delivery:
 - Defines quality gates and evidence requirements.
 - Performs final verification and acceptance decisions.
 
-### ComfyUI asset forge
+### Visual asset providers
 
-ComfyUI is not the slide composer. It generates visual assets such as:
+SlideForge treats image generation as a provider-routed candidate source, not as the slide composer itself.
 
-- aurora / neon / cinematic backgrounds
-- 3D glass technology objects
-- section-divider art
-- visual bands
-- style-matched infographic or icon assets
+Default v2 route:
 
-Generated assets should be text-free. Korean text, tables, charts, and diagrams should be overlaid deterministically by the slide composer.
+- SlideForge writes OpenAI Images prompt packs from asset specs.
+- The operator manually uses ChatGPT Pro / OpenAI Images in the browser.
+- Downloaded images are saved under the run directory and imported into the same approval gate as every other candidate.
+
+ComfyUI remains useful for:
+
+- local/private generation where assets cannot leave the workstation
+- high-control model/workflow experiments
+- cases where the operator wants to use the ComfyUI UI as the visual review surface
+- fallback production when OpenAI Images is unavailable or not appropriate
+
+All generated assets should be text-free unless a spec explicitly allows otherwise. Korean text, tables, charts, and diagrams should be overlaid deterministically by the slide composer.
 
 ### codex-guizang-html composer
 
@@ -78,6 +101,49 @@ PYTHONPATH=src python -m slideforge.cli export-pptx \
 
 The first-pass native PPTX seam maps deck title, subtitle, bullets, metrics, timeline, chart, comparison, and visual-chip content into deterministic PowerPoint shapes/text with Korean-capable font metadata where possible. It is not a visual parity claim; use renderer evidence or manual QA before final delivery.
 
+## Production pipeline history and v2 rationale
+
+### What happened in the earlier version
+
+The first production direction treated ComfyUI as the primary source for high-quality graphical assets. That was attractive because it can run locally and gives strong control over models/workflows, but practical slide runs exposed several problems:
+
+- **Quality mismatch:** high-quality standalone image generation did not automatically improve slide-reference similarity. Some ComfyUI-heavy attempts scored worse than simpler HTML/CSS/SVG layout skeletons because generated assets changed the visual language too much.
+- **Operational overhead:** local model setup, workflow tuning, GPU/runtime management, and output-path tracking created extra work before a deck could even enter normal review.
+- **Pipeline brittleness:** asset generation, candidate review, and final deck assembly were too tightly associated with one provider. If ComfyUI was unavailable or produced weak assets, the whole production path felt blocked.
+- **Text risk:** generated images can contain unwanted letters, numbers, logos, watermarks, or pseudo-labels. SlideForge needs deterministic text, charts, and Korean copy controlled by the composer, not by image models.
+- **Cost/account reality:** the operator already has ChatGPT Pro and can manually use OpenAI Images, while automated API usage would require separate API billing and credentials.
+
+### How the design changed
+
+The pipeline name stayed the same, but the asset-generation stage became provider-routed and versioned as Visual Asset Approval Pipeline v2.
+
+The default v2 flow is:
+
+```text
+asset-specs/*.json
+  -> generate-openai-manual-prompts
+  -> openai-manual-prompts/prompt-pack.md
+  -> operator manually generates images in ChatGPT Pro / OpenAI Images
+  -> manual-generated-assets/<asset_id>/A.png, B.png, C.png
+  -> import-manual-assets
+  -> asset-generation-report.json
+  -> build-asset-review-board
+  -> approve-assets
+  -> approved-assets.json
+  -> apply-approved-assets / deck assembly / QA evidence
+```
+
+This keeps image generation as a candidate source while preserving the durable review/approval/apply artifacts already used by the project.
+
+### Why this design is better
+
+- **Uses the available paid tool without pretending it is an API:** ChatGPT Pro / OpenAI Images is used manually in the browser; SlideForge does not automate the web UI, store cookies, or call the OpenAI API.
+- **Keeps provenance:** imported candidates record `provider=openai_images`, `source=manual_openai_images`, `generation_mode=manual_chatgpt_pro`, prompt file, license note, asset id, candidate id, and final path.
+- **Preserves approval discipline:** every visual still goes through `asset-review-board` and `approved-assets.json`; no image is silently inserted into the deck.
+- **Keeps layout deterministic:** image models produce text-free visual objects; SlideForge owns slide text, charts, tables, and final composition.
+- **Allows fallback and future providers:** ComfyUI, deterministic SVG, Recraft, Ideogram, FLUX, or a future OpenAI API provider can all become candidate sources without changing the approval contract.
+- **Improves operator handoff:** if no candidates are imported, the review board now gives explicit save-path and rerun instructions instead of becoming a dead end.
+
 ## ComfyUI handoff report
 
 `generate-asset-briefs` produces the text-free payload consumed by the ComfyUI handoff seam. `comfyui-handoff` writes evidence for an already-running ComfyUI-compatible REST endpoint without installing ComfyUI, downloading models, or claiming image generation when no output file exists.
@@ -98,10 +164,10 @@ The report records `provider`, `endpoint`, `status`, `server_available`, `workfl
 
 ## Visual asset approval gate
 
-ComfyUI can remain the primary visual review UI when the operator is at the local PC. SlideForge treats ComfyUI UI, an HTML review board, or messaging review as interchangeable ways to inspect candidates; the durable source of truth is always `approved-assets.json`.
+The review board is the default durable review surface for v2. ComfyUI UI, local files, manual OpenAI Images downloads, deterministic SVG outputs, or messaging review can all feed candidate assets into the same gate; the source of truth is always `approved-assets.json`.
 
 ```text
-ComfyUI UI / review board / Telegram selection
+Provider/manual candidate source
   -> generate-asset-candidates
   -> asset-generation-report.json
   -> build-asset-review-board
@@ -299,8 +365,7 @@ The summary inspects `manifest.json`, `evidence-index.md`, `deck.json`, `deck.ht
 - `codex-reveal-playwright`: fallback/export experiment only.
 - `codex-editable-html-slides`: excluded from competitive production selection.
 
-## Initial pipeline
-
+## Current pipeline
 ```text
 Reference Input
   ↓
@@ -310,13 +375,17 @@ Design Spec
   ↓
 Content-to-Archetype Mapper
   ↓
-Asset Brief Generator
+Asset Spec Generator
   ↓
-ComfyUI Asset Forge
+Visual Asset Approval Pipeline v2
+  - OpenAI Images manual prompt/import path by default
+  - ComfyUI/local/provider candidates when appropriate
   ↓
 Guizang HTML Composer
   ↓
-Visual QA + Fidelity Scoring
+Asset Approval Application
+  ↓
+Visual QA + Fidelity Scoring + Evidence Summary
   ↓
 Optional PPTX Delivery
 ```
@@ -330,9 +399,13 @@ Current Phase 1 primitives:
 - `slideforge.design_spec` — structured colors, typography, slide archetypes, background layers, and graphic motifs.
 - `slideforge.template_analyzer` — converts template observations into a design spec.
 - `slideforge.archetype_mapper` — maps content sections to template-like slide archetypes.
-- `slideforge.asset_brief` — defines text-free ComfyUI asset briefs.
+- `slideforge.asset_brief` — defines text-free local/provider asset briefs.
+- `slideforge.asset_spec` — normalizes visual asset slots for provider-routed generation.
+- `slideforge.manual_prompts` — writes ChatGPT Pro / OpenAI Images prompt packs from asset specs.
+- `slideforge.manual_assets` — imports manually downloaded OpenAI Images candidates into the approval report shape.
+- `slideforge.asset_approval` — builds review boards, records approvals, and applies approved assets.
 - `slideforge.fidelity_scorer` — scores output fidelity with the 100-point rubric.
-- `slideforge.cli` — writes design-spec and fidelity-score JSON artifacts.
+- `slideforge.cli` — writes design-spec, asset, approval, run, and fidelity artifacts.
 
 Example local checks:
 
