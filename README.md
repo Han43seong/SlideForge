@@ -1,5 +1,7 @@
 # SlideForge
 
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+
 디자인 레퍼런스(PPTX 템플릿·스크린샷·이미지·PDF·웹 페이지)에서 고품질 프레젠테이션 덱을 생성하는 Python 파이프라인.
 
 ---
